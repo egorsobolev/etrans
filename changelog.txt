@@ -1,0 +1,11 @@
+2012-11-30 Egor Sobolev <egor@impb.psn.ru>
+ * changed the range of "good" approximation from 2.0 to 0.75 * M_PI 
+ * unified code for first adjustment of time step and code for
+   adjustment time step on iterations 
+ * fixed the interval of linear extrapolation of quantum equations
+   matrix in the procedure for adjustment of time step 
+ * added option -Q - frequency of quantum frames output 
+ * fixed estimate of the number of trajectories computed between
+   control points 
+ * released 0.12
+ 
