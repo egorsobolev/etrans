@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <malloc.h>
 
+#include "etrans.h"
+
 static float bet[] = {
 	 0.00f,	/* G 0 00 */
 	 6.84f,	/* A 1 01 */
@@ -69,7 +71,7 @@ int seqscan(FILE *f, char **seq)
 	return i;
 }
 
-int seqdna(int n, const char *seq, float *d, float *s)
+int seqdna(int n, const char *seq, real_t *d, real_t *s)
 {
 	int k, l, i;
 
@@ -81,7 +83,7 @@ int seqdna(int n, const char *seq, float *d, float *s)
 	else if (seq[0] == 'T') k = 2;
 	else if (seq[0] == 'C') k = 3;
 	else return 2;
-	d[0] = bet[k];
+	d[0] = (real_t) bet[k];
 	l = k << 2;
 	for (i = 1; i < n; ++i) {
 		if (seq[i]  == 'G') k = 0;
@@ -89,8 +91,8 @@ int seqdna(int n, const char *seq, float *d, float *s)
 		else if (seq[i] == 'T') k = 2;
 		else if (seq[i] == 'C') k = 3;
 		else return 2;
-		d[i] = bet[k];
-		s[i - 1] = lam[l | k];
+		d[i] = (real_t) bet[k];
+		s[i - 1] = (real_t) lam[l | k];
 		l = k << 2;
 	}
 	return 0;

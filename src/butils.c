@@ -4,10 +4,10 @@
 #include <malloc.h>
 #include <stdio.h>
 
-void diff_b(eqdata_t *d, float *b, float *u, float *db, float *d2b)
+void diff_b(eqdata_t *d, real_t *b, real_t *u, real_t *db, real_t *d2b)
 {
     int n, n1, i;
-    float *x, *y, *dx, *dy, *d2x, *d2y, *v;
+    real_t *x, *y, *dx, *dy, *d2x, *d2y, *v;
     n = d->n;
     n1 = n - 1;
     v = u + n;
@@ -38,10 +38,11 @@ void diff_b(eqdata_t *d, float *b, float *u, float *db, float *d2b)
     d2y[n1] = -(d->s[n1-1] * dx[n1-1] + (d->d[n1] + d->sv * u[n1]) * dx[n1] + d->sv * v[n1] * x[n1]);
 }
 
-int b0_read(FILE *f, int n, float *x)
+int b0_read(FILE *f, int n, real_t *x)
 {
         int m, c, lm, rm, i, j;
-        float *a;
+        real_t *a;
+        double b;   
 
         a = x;
 
@@ -59,12 +60,13 @@ int b0_read(FILE *f, int n, float *x)
                                 if (c == EOF) return -1;
                         }
                 } else {
-                        memset(a, 0, lm * sizeof(float));
+                        memset(a, 0, lm * sizeof(real_t));
                         a += lm;
                 }
                 for (j = 0; j < m; ++j) {
-                        c = fscanf(f, "%f", a);
+                        c = fscanf(f, "%lf", &b);
                         if (c != 1) return -2;
+		        *a = b;
                         ++a;
                 }
                 if (m > n) {
@@ -73,7 +75,7 @@ int b0_read(FILE *f, int n, float *x)
                                 if (c == EOF) return -1;
                         }
                 } else {
-                        memset(a, 0, rm * sizeof(float));
+                        memset(a, 0, rm * sizeof(real_t));
                         a += rm;
                 }
         }

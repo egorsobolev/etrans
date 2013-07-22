@@ -16,25 +16,36 @@
 #define walltime()	((double) clock() / CLOCKS_PER_SEC)
 #endif
 
-extern float a0;
-extern float ar[];
-extern float ai[];
-extern float thr[];
-extern float thi[];
+extern double a0;
+extern double ar[];
+extern double ai[];
+extern double thr[];
+extern double thi[];
 
+#ifdef USE_SINGLE
 void thomas1s(int n, const float *ai, float ar, const float *bi, const float *di, const float *dr, float *xi, float *xr, float *work);
 float clapack_slamch(char cmach);
 void clapack_sstevx(char jobz, char range, int n, float *d, float *e,
 	float vl, float vu, int il, int iu, float abstol,
 	int *m, float *w, float *z, int ldz,
 	float *work, int *iwork, int *ifail, int *info);
+#define REAL_MAX FLT_MAX
+#else
+void thomas1d(int n, const double *ai, double ar, const double *bi, const double *di, const double *dr, double *xi, double *xr, double *work);
+double clapack_dlamch(char cmach);
+void clapack_dstevx(char jobz, char range, int n, double *d, double *e,
+	double vl, double vu, int il, int iu, double abstol,
+	int *m, double *w, double *z, int ldz,
+	double *work, int *iwork, int *ifail, int *info);
+#define REAL_MAX DBL_MAX
+#endif
 
-int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
+int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, solution_t *r)
 {
 	int nstep, nskip, osc_n1, n, i, j, jn, ln, k, l, m, q, qn, tn, t, neigs, info, ps;
-	float p2, w, abstol, a, b, t0, sn, cs, h0, hmax, normp, mn, mx, nr, osc_period, osc_h;
-	float *u, *v, *s0, *d0, *ds, *dk, *s0r, *s0i, *tr, *ti, *work, *wa, *b2l, *b2r, *b2t, *x;
-        float *sr, *si, *dsr, *dsi, *d2sr, *d2si;
+	real_t p2, w, abstol, a, b, t0, sn, cs, h0, hmax, normp, mn, mx, nr, osc_period, osc_h;
+	real_t *u, *v, *s0, *d0, *ds, *dk, *s0r, *s0i, *tr, *ti, *work, *wa, *b2l, *b2r, *b2t, *x;
+        real_t *sr, *si, *dsr, *dsi, *d2sr, *d2si;
 	int *iwork, rank;
 	double elapse, wtm0, wtm1, c, dc, d2c;
 
@@ -44,7 +55,7 @@ int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
 	rank = 0;
 #endif
 
-	abstol = 2.0f * clapack_slamch('S');
+	abstol = 2.0 * clapack_lamch('S');
 	osc_n1 = d->osc_nstep - 1;
 
 	qn = r->nsamp + nsamp;
@@ -53,7 +64,7 @@ int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
 	nstep = r->nstep * d->q_outstep;
 	r->n = n;
 
-	d0 = (float *) malloc(24 * n * sizeof(float) + 5 * n * sizeof(int));
+	d0 = (real_t *) malloc(24 * n * sizeof(real_t) + 5 * n * sizeof(int));
 	if (!d0) return -1;
 
 	s0 = d0 + n;
@@ -92,10 +103,10 @@ int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
 		    viRngUniform(VSL_RNG_METHOD_UNIFORM_STD, d->osc.rstr, 1, &ps, 0, 1000);
 		    osc_equilibrate(&d->osc, osc_h, d->x, ps);
                 }
-		cblas_scopy(2 * n, d->x, 1, x, 1);
-		cblas_saxpy(2 * n, 1.0f, d->x0 + 2 * n, 1, x, 1); 
-		cblas_scopy(2 * n, d->x0, 1, sr, 1);
-		p2 = 1.0f;
+		cblas_copy(2 * n, d->x, 1, x, 1);
+		cblas_axpy(2 * n, 1.0, d->x0 + 2 * n, 1, x, 1); 
+		cblas_copy(2 * n, d->x0, 1, sr, 1);
+		p2 = 1.0;
 
 		diff_b(d, sr, x, dsr, d2sr);
 		c = 0.0;
@@ -104,7 +115,7 @@ int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
 		for (k = 0; k < n; ++k) {
 			a = sr[k] * sr[k] + si[k] * si[k];
 			b2l[k] = a;
-			b = (float) k - d->half;
+			b = (real_t) k - d->half;
 		        b = b * b;
 			c += (double) a * b;
 		        b *= 2.0;
@@ -126,9 +137,9 @@ int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
 		r->dc2[0] += dc * dc;
 		r->d2c2[0] += d2c * d2c;
 
-		nr = 0.0f;
-		mn = FLT_MAX;
-		mx = 0.0f;
+		nr = 0.0;
+		mn = REAL_MAX;
+		mx = 0.0;
 
 		jn = d->osc_outstep;
 	        tn = d->q_outstep;
@@ -142,14 +153,14 @@ int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
 
 		        if (!ln) {
 				/* d0 = d + u(j) */
-				cblas_scopy(n, d->d, 1, d0, 1);
-				cblas_saxpy(n, d->sv, u, 1, d0, 1);
-				cblas_scopy(n, d0, 1, ds, 1);
-				cblas_saxpy(n, d->h_revstep * h * d->sv, v, 1, ds, 1);
+				cblas_copy(n, d->d, 1, d0, 1);
+				cblas_axpy(n, d->sv, u, 1, d0, 1);
+				cblas_copy(n, d0, 1, ds, 1);
+				cblas_axpy(n, d->h_revstep * h * d->sv, v, 1, ds, 1);
 
-				clapack_sstevx('N', 'I', n, d0, d->s, 0.0f, 1.0f, 1, 1, abstol, &neigs, wa, NULL, n, work, iwork, NULL, &info);
+				clapack_stevx('N', 'I', n, d0, d->s, 0.0, 1.0, 1, 1, abstol, &neigs, wa, NULL, n, work, iwork, NULL, &info);
 				a = wa[0];
-				clapack_sstevx('N', 'I', n, ds, d->s, 0.0f, 1.0f, 1, 1, abstol, &neigs, wa, NULL, n, work, iwork, NULL, &info);
+				clapack_stevx('N', 'I', n, ds, d->s, 0.0, 1.0, 1, 1, abstol, &neigs, wa, NULL, n, work, iwork, NULL, &info);
 				b = wa[0];
 
 				w = a < b ? a : b;
@@ -157,12 +168,12 @@ int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
 					d0[k] -= w;
 					ds[k] -= w;
 				}
-				clapack_sstevx('N', 'I', n, d0, d->s, 0.0f, 1.0f, n, n, abstol, &neigs, wa, NULL, n, work, iwork, NULL, &info);
+				clapack_stevx('N', 'I', n, d0, d->s, 0.0, 1.0, n, n, abstol, &neigs, wa, NULL, n, work, iwork, NULL, &info);
 				a = wa[0];
-				clapack_sstevx('N', 'I', n, ds, d->s, 0.0f, 1.0f, n, n, abstol, &neigs, wa, NULL, n, work, iwork, NULL, &info);
+				clapack_stevx('N', 'I', n, ds, d->s, 0.0, 1.0, n, n, abstol, &neigs, wa, NULL, n, work, iwork, NULL, &info);
 				b = wa[0];
 
-				hmax = 0.75f * M_PI / (a > b ? a : b);
+				hmax = 0.75 * M_PI / (a > b ? a : b);
 				if (hmax > d->osc_h) hmax = d->osc_h;
 				nskip = h > hmax ? (int) ceil(h / hmax) : 1;
 				h0 = h / nskip;
@@ -170,55 +181,55 @@ int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
 				if (h0 < mn) mn = h0;
 
 				a = w * h0;
-				sn = 0.5f * sinf(a);
-				cs = 0.5f * cosf(a);
+				sn = 0.5 * _sin(a);
+				cs = 0.5 * _cos(a);
 
-				cblas_scopy(n - 1, d->s, 1, s0, 1);
-				cblas_sscal(n - 1, h0, s0, 1);
+				cblas_copy(n - 1, d->s, 1, s0, 1);
+				cblas_scal(n - 1, h0, s0, 1);
 			   
 			        ln = d->h_revstep;
 			}
 			for (m = 0; m < nskip; ++m) {
 				/* ds = h * (d0 + dt * v(j)) */
-				cblas_scopy(n, d->d, 1, ds, 1);
-				cblas_saxpy(n, d->sv, u, 1, ds, 1);
+				cblas_copy(n, d->d, 1, ds, 1);
+				cblas_axpy(n, d->sv, u, 1, ds, 1);
 				/*cblas_scopy(n, d0, 1, ds, 1);*/
-				cblas_saxpy(n, (m + 0.5f) * h0 * d->sv, v, 1, ds, 1);
-				cblas_sscal(n, h0, ds, 1);
+				cblas_axpy(n, (m + 0.5) * h0 * d->sv, v, 1, ds, 1);
+				cblas_scal(n, h0, ds, 1);
 
-				cblas_scopy(n, sr, 1, s0r, 1);
-				cblas_scopy(n, si, 1, s0i, 1);
+				cblas_copy(n, sr, 1, s0r, 1);
+				cblas_copy(n, si, 1, s0i, 1);
 
-				cblas_sscal(n, a0, s0r, 1);
-				cblas_sscal(n, a0, s0i, 1);
+				cblas_scal(n, a0, s0r, 1);
+				cblas_scal(n, a0, s0i, 1);
 				for (l = 0; l < 14; ++l) {
 					for (k = 0; k < n; ++k)
 						dk[k] = ds[k] - thi[l];
-					thomas1s(n, dk, -thr[l], s0, si, sr, ti, tr, work);
+					thomas1(n, dk, -thr[l], s0, si, sr, ti, tr, work);
 					/* s0r = s0r + ar[k] * tr - ai[k] * ti */
-					cblas_saxpy(n,  ar[l], tr, 1, s0r, 1);
-					cblas_saxpy(n, -ai[l], ti, 1, s0r, 1);
+					cblas_axpy(n,  ar[l], tr, 1, s0r, 1);
+					cblas_axpy(n, -ai[l], ti, 1, s0r, 1);
 					/* s0i = s0i + ai[k] * tr + ar[k] * ti */
-					cblas_saxpy(n,  ai[l], tr, 1, s0i, 1);
-					cblas_saxpy(n,  ar[l], ti, 1, s0i, 1);
+					cblas_axpy(n,  ai[l], tr, 1, s0i, 1);
+					cblas_axpy(n,  ar[l], ti, 1, s0i, 1);
 				}
-				cblas_scopy(n, s0r, 1, sr, 1);
-				cblas_scopy(n, s0i, 1, si, 1);
+				cblas_copy(n, s0r, 1, sr, 1);
+				cblas_copy(n, s0i, 1, si, 1);
 				/* sr = cs * s0r + sn * s0i */
-				cblas_sscal(n, cs, sr, 1);
-				cblas_saxpy(n, sn, s0i, 1, sr, 1);
+				cblas_scal(n, cs, sr, 1);
+				cblas_axpy(n, sn, s0i, 1, sr, 1);
 				/* si = cs * s0i - sn * s0r */
-				cblas_sscal(n,  cs, si, 1);
-				cblas_saxpy(n, -sn, s0r, 1, si, 1);
+				cblas_scal(n,  cs, si, 1);
+				cblas_axpy(n, -sn, s0r, 1, si, 1);
 
-				p2 = cblas_sdot(2 * n, sr, 1, sr, 1);
-				normp = fabsf(p2 - 1.0f);
+				p2 = cblas_dot(2 * n, sr, 1, sr, 1);
+				normp = _fabs(p2 - 1.0);
 				if (normp > nr)
 					nr = normp;
 
-				p2 = sqrtf(p2);
-				a = 1.0f / p2;
-				cblas_sscal(2 * n, a, sr, 1);
+				p2 = _sqrt(p2);
+				a = 1.0 / p2;
+				cblas_scal(2 * n, a, sr, 1);
 
 /*				t0 += h0;*/
 			}
@@ -240,7 +251,7 @@ int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
 			   d2c = 0.0;
 			   for (k = 0; k < n; ++k) {
 			      a = b2l[k];
-			      b = (float) k - d->half;
+			      b = (real_t) k - d->half;
 			      b = b * b;
 			      c += (double) a * b;
 			      b *= 2.0;
@@ -272,9 +283,9 @@ int eq(eqdata_t *d, float h, float tmax, int nsamp, solution_t *r)
 		}
 		wtm1 = walltime();
 		if (!rank) {
-		        c = sqrtf(0.5f * n * d->osc.kt);
-		        a = 2.0f * M_PI * cblas_snrm2(n, d->x, 1) / (c *  d->osc.period);
-		        b = cblas_snrm2(n, d->x + n, 1) / c;
+		        c = _sqrt(0.5 * n * d->osc.kt);
+		        a = 2.0 * M_PI * cblas_nrm2(n, d->x, 1) / (c *  d->osc.period);
+		        b = cblas_nrm2(n, d->x + n, 1) / c;
 			printf("%6d %8.2f %9.2g %9.6g %9.6g %9.6g %9.6g\n", q + 1, wtm1 - wtm0, (double) nr, (double) mn, (double) mx, (double) a, (double) b);
 			fflush(stdout);
 		}

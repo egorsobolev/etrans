@@ -64,7 +64,7 @@ $(OBJSRL):	| .o.serial
 
 argtable:	| ../argtable2-13
 
-../argtable2-13:
+../argtable2-13: ../argtable2-13.tar.gz
 	( \
 	    cd ..; \
 	    tar -xzf argtable2-13.tar.gz; \
@@ -72,6 +72,13 @@ argtable:	| ../argtable2-13
 	    ./configure --prefix=`pwd`; \
 	    make install; \
 	    cd ../src; \
+	)
+	
+../argtable2-13.tar.gz:
+	( \
+	    cd ..; \
+	    wget http://prdownloads.sourceforge.net/argtable/argtable2-13.tar.gz; \
+	    cd src; \
 	)
 
 .PHONY:	clean

@@ -13,3 +13,17 @@ void clapack_sstevx(char jobz, char range, int n, float *d, float *e,
 	sstevx(&jobz, &range, &n, d, e, &vl, &vu, &il, &iu, &abstol, m, w, z, &ldz, work, iwork, ifail, info);
 
 }
+
+double clapack_dlamch(char cmach)
+{
+	return dlamch(&cmach);
+}
+
+void clapack_dstevx(char jobz, char range, int n, double *d, double *e,
+			   double vl, double vu, int il, int iu, double abstol,
+			   int *m, double *w, double *z, int ldz,
+			   double *work, int *iwork, int *ifail, int *info)
+{
+	dstevx(&jobz, &range, &n, d, e, &vl, &vu, &il, &iu, &abstol, m, w, z, &ldz, work, iwork, ifail, info);
+
+}

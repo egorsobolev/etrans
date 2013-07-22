@@ -3,6 +3,7 @@
 *.o
 *.so
 bin/*
+test/
 src/.o.mpi/
 src/.o.serial/
 argtable2*

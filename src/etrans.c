@@ -85,7 +85,7 @@ int main(int argc, char **argv)
 	char *seq, *progname = "etrans", *fntmp;
         int sol_size, m, m1, s, n, nstep, nsamp, nskip, exitcode, nerrors, qn, i, heat_nstep;
 	size_t fnlen, fcnt;
-	float h, tmax, heat_h, upr, mu;
+	real_t h, tmax, heat_h, upr, mu;
 	double *rbuf, wtm0, wtm1, elapse, droptime, k1, k2;
 	eqdata_t d;
 	solution_t rs, ri;
@@ -164,8 +164,8 @@ int main(int argc, char **argv)
 	    printf("\n");
 	}
 
-	tmax = (float) opt_tmax->dval[0];
-	h = (float) opt_h->dval[0];
+	tmax = (real_t) opt_tmax->dval[0];
+	h = (real_t) opt_h->dval[0];
         nskip = opt_nq->ival[0];
 	nstep = (int) ceil(tmax / (h * nskip));
 	nsamp = opt_nsamp->ival[0];
@@ -207,7 +207,7 @@ int main(int argc, char **argv)
 
 	d.n = n;
 	d.half = (n - 1) / 2;
-	d.sv = (float) opt_lambda->dval[0];
+	d.sv = (real_t) opt_lambda->dval[0];
         d.h_revstep = opt_na->ival[0];
         d.q_outstep = nskip;
         d.x0rnd = (opt_nxt->count == 0);
@@ -224,7 +224,7 @@ int main(int argc, char **argv)
 
 	fnlen = strlen(opt_outfn->filename[0]);
 
-	d.x = (float *) malloc(8 * n * sizeof(float) + fnlen + 1);
+	d.x = (real_t *) malloc(8 * n * sizeof(real_t) + fnlen + 1);
 	if (!d.x) {
 		printf("%s: insufficient memory\n", progname);
 		exitcode = -1;
@@ -259,18 +259,18 @@ int main(int argc, char **argv)
 			goto exit2;
 		}
 	} else {
-		memset(d.x0, 0, 4 * n * sizeof(float));
+		memset(d.x0, 0, 4 * n * sizeof(real_t));
 		d.x0[d.half] = 1.0f;
 	}
 	/*
 	cblas_sscal(n - 1, h, d.s0, 1);
 	*/
-        upr = (float) opt_elas->dval[0];
-        mu = (float) ((opt_mu->count) ? opt_mu->dval[0] : opt_lambda->dval[0]);
+        upr = (real_t) opt_elas->dval[0];
+        mu = (real_t) ((opt_mu->count) ? opt_mu->dval[0] : opt_lambda->dval[0]);
 	if (osc_init(&d.osc, n,
-		(float) opt_temp->dval[0], (float) opt_fric->dval[0],
-		upr, (float) opt_xi->dval[0],
-		(float) opt_mu->dval[0])) {
+		(real_t) opt_temp->dval[0], (real_t) opt_fric->dval[0],
+		upr, (real_t) opt_xi->dval[0],
+		(real_t) opt_mu->dval[0])) {
 			printf("%s: insufficient memory\n", progname);
 			exitcode = -3;
 			goto exit2;
@@ -330,7 +330,7 @@ int main(int argc, char **argv)
 	        printf("Langevin inizialization mode: random\n\n");
 	} else {
 	    if (opt_hh->count > 0)
-	        heat_h = (float) opt_hh->dval[0];
+	        heat_h = (real_t) opt_hh->dval[0];
 	    else
                 heat_h = d.osc.period / 1000.0;
 	    heat_nstep = opt_nh->ival[0];
@@ -341,8 +341,8 @@ int main(int argc, char **argv)
 	        printf("Langevin initial distibution:\n");
 	        if (d.osc.kt > 0.0f) {
 		    k1 = 1.0f / sqrtf(0.5f * n * d.osc.kt);
-		    printf(" sqrt(2<u^2>w0^2/kT) = %f\n", k1 * cblas_snrm2(n, d.x, 1) / sqrtf(upr));
-		    printf(" sqrt(2<v^2>/kT) = %f\n", k1 * cblas_snrm2(n, d.x + n, 1) );
+		    printf(" sqrt(2<u^2>w0^2/kT) = %f\n", k1 * cblas_nrm2(n, d.x, 1) / _sqrt(upr));
+		    printf(" sqrt(2<v^2>/kT) = %f\n", k1 * cblas_nrm2(n, d.x + n, 1) );
 		} else {
 		    printf(" u[i] = 0, v[i] = 0\n");
 		}

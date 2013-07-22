@@ -5,10 +5,20 @@
  * output:
  *   xi(n,m), xr(n,m)
  */
+#include "etrans.h"
+
+#ifdef USE_SINGLE
+#define REAL float
+
 void thomas1s(int n, const float *ai, float ar, const float *bi, const float *di, const float *dr, float *xi, float *xr, float *work)
+#else
+#define REAL double
+
+void thomas1d(int n, const double *ai, double ar, const double *bi, const double *di, const double *dr, double *xi, double *xr, double *work)
+#endif
 {
 	int i, i1, n1;
-	float *mr, *mi, m2, yr, yi, lr, li, b1;
+	REAL *mr, *mi, m2, yr, yi, lr, li, b1;
 
 	n1 = n - 1;
     mr = work;
@@ -55,3 +65,4 @@ void thomas1s(int n, const float *ai, float ar, const float *bi, const float *di
 		xi[i] = yi * mr[i] - yr * mi[i];
 	}
 }
+#undef REAL
