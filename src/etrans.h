@@ -1,45 +1,50 @@
 #ifndef __ETRANS_H
 #define __ETRANS_H
 
-#include <mkl.h>
 #include <stdio.h>
 
-#define REFERENCE_OPS 2e6
+#include "config.h"
 
-#undef USE_SINGLE
+#ifdef USE_MKL
+# include <mkl.h>
+typedef VSLStreamStatePtr rng_stream;
+#else
+# include <gsl/gsl_rng.h>
+typedef gsl_rng *rng_stream;
+#endif
 
 #ifdef USE_SINGLE
 typedef float real_t;
 
-#define _sqrt(X) sqrtf(X)
-#define _sin(X) sinf(X)
-#define _cos(X) cosf(X)
-#define _fabs(X) fabsf(X)
-#define cblas_copy cblas_scopy
-#define cblas_scal cblas_sscal
-#define cblas_dot cblas_sdot
-#define cblas_nrm2 cblas_snrm2
-#define cblas_axpy cblas_saxpy
-#define clapack_lamch clapack_slamch
-#define clapack_stevx clapack_sstevx
-#define vRngGaussian vsRngGaussian
-#define thomas1 thomas1s
+# define _sqrt(X) sqrtf(X)
+# define _sin(X) sinf(X)
+# define _cos(X) cosf(X)
+# define _fabs(X) fabsf(X)
+# define cblas_copy cblas_scopy
+# define cblas_scal cblas_sscal
+# define cblas_dot cblas_sdot
+# define cblas_nrm2 cblas_snrm2
+# define cblas_axpy cblas_saxpy
+# define clapack_lamch clapack_slamch
+# define clapack_stevx clapack_sstevx
+# define vRngGaussian vsRngGaussian
+# define thomas1 thomas1s
 #else
 typedef double real_t;
 
-#define _sqrt(X) sqrt(X)
-#define _sin(X) sin(X)
-#define _cos(X) cos(X)
-#define _fabs(X) fabs(X)
-#define cblas_copy cblas_dcopy
-#define cblas_scal cblas_dscal
-#define cblas_dot cblas_ddot
-#define cblas_nrm2 cblas_dnrm2
-#define cblas_axpy cblas_daxpy
-#define clapack_lamch clapack_dlamch
-#define clapack_stevx clapack_dstevx
-#define vRngGaussian vdRngGaussian
-#define thomas1 thomas1d
+# define _sqrt(X) sqrt(X)
+# define _sin(X) sin(X)
+# define _cos(X) cos(X)
+# define _fabs(X) fabs(X)
+# define cblas_copy cblas_dcopy
+# define cblas_scal cblas_dscal
+# define cblas_dot cblas_ddot
+# define cblas_nrm2 cblas_dnrm2
+# define cblas_axpy cblas_daxpy
+# define clapack_lamch clapack_dlamch
+# define clapack_stevx clapack_dstevx
+# define vRngGaussian vdRngGaussian
+# define thomas1 thomas1d
 #endif
 
 struct OSCILATOR
@@ -52,7 +57,7 @@ struct OSCILATOR
 	real_t *upr;
 	real_t *sig;
 	real_t *runge_temp;
-	VSLStreamStatePtr rstr;
+	rng_stream rstr;
 	int nsite;
 };
 typedef struct OSCILATOR oscilator_t;

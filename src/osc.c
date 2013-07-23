@@ -1,10 +1,19 @@
+#include "config.h"
+
 #include <time.h>
 #include <string.h>
 #include <math.h>
-#include <mkl.h>
+
+#ifdef USE_MKL
+# include <mkl.h>
+#else
+# include <gsl/gsl_cblas.h>
+# include <gsl/gsl_rng.h>
+# include <gsl/gsl_randist.h>
+#endif
 
 #ifdef WIN32
-#include <process.h>
+# include <process.h>
 #define getpid _getpid
 typedef int pid_t;
 
@@ -71,7 +80,12 @@ void runge(oscilator_t *o, real_t h, real_t *x)
 
 	cblas_copy(m, x, 1, y, 1);
 
-	vRngGaussian(VSL_METHOD_SGAUSSIAN_BOXMULLER2, o->rstr, o->n, x + o->n, 0.0, 1.0);
+#ifdef USE_MKL
+	vRngGaussian(VSL_RNG_METHOD_GAUSSIAN_ICDF, o->rstr, o->n, x + o->n, 0.0, 1.0);
+#else
+	for (i = o->n; i < m; ++i)
+            x[i] = (real_t) gsl_ran_gaussian_ziggurat(o->rstr, 1.0);
+#endif
 	/*memset(x + o->n, 0, o->n * sizeof(float));*/
 
 	for (i = o->n; i < m; ++i)
@@ -96,7 +110,12 @@ void runge2(oscilator_t *o, real_t h, real_t *x, real_t *b0, real_t *b1)
 
 	cblas_copy(m, x, 1, y, 1);
 
-	vRngGaussian(VSL_METHOD_SGAUSSIAN_BOXMULLER2, o->rstr, o->n, x + o->n, 0.0, 1.0);
+#ifdef USE_MKL
+	vRngGaussian(VSL_RNG_METHOD_GAUSSIAN_ICDF, o->rstr, o->n, x + o->n, 0.0, 1.0);
+#else
+	for (i = o->n; i < m; ++i)
+            x[i] = (real_t) gsl_ran_gaussian_ziggurat(o->rstr, 1.0);
+#endif
 	/*memset(x + o->n, 0, o->n * sizeof(float));*/
 
 	for (i = o->n; i < m; ++i)
@@ -130,13 +149,20 @@ void osc_integrate(oscilator_t *osc, real_t h, real_t *x, int nskip, int nout, r
 
 void osc_x0_rand(oscilator_t *o, real_t *x)
 {
-    int i;
+    int i, n2;
+    double sigma;
+    n2 = 2 * o->n;
+    sigma = _sqrt(0.5 * o->kt);
     if (o->kt == 0.0) {
-        memset(x, 0, 2 * o->n * sizeof(real_t));
+        memset(x, 0, n2 * sizeof(real_t));
         return;
     }
-	
-    vRngGaussian(VSL_METHOD_SGAUSSIAN_BOXMULLER2, o->rstr, 2 * o->n, x, 0.0, _sqrt(0.5 * o->kt));
+#ifdef USE_MKL
+    vRngGaussian(VSL_RNG_METHOD_GAUSSIAN_ICDF, o->rstr, n2, x, 0.0, sigma);
+#else
+    for (i = 0; i < n2; ++i)
+        x[i] = (real_t) gsl_ran_gaussian_ziggurat(o->rstr, sigma);
+#endif
     for (i = 0; i < o->n; ++i) {
        if (o->upr[i] == 0.0)
 	   x[i] = x[i + o->n] = 0.0;
@@ -150,7 +176,7 @@ int osc_init(oscilator_t *o, int n, real_t temp, real_t tren, real_t upr, real_t
 	static real_t e0 = 0.261838952;
 	static real_t t0 = 100.0;
 	int i, a;
-	int seed;
+	unsigned int seed;
 	struct timeval tm;
 	pid_t pid;
 #ifdef MPI
@@ -174,11 +200,20 @@ int osc_init(oscilator_t *o, int n, real_t temp, real_t tren, real_t upr, real_t
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	seed = seed * np + rank;
 #endif
+#ifdef USE_MKL
 	if (vslNewStream(&o->rstr, VSL_BRNG_MT19937, seed) != VSL_STATUS_OK) {
 		/*if (vslNewStream(&o->rstr, VSL_BRNG_MCG59, seed) != VSL_STATUS_OK) {*/
 		free(o->xi);
 		return 2;
 	}
+#else
+        o->rstr = gsl_rng_alloc(gsl_rng_mt19937);
+        if (!o->rstr) {
+	   free(o->xi);
+	   return 2;
+	}
+        gsl_rng_set(o->rstr, seed);
+#endif
 	o->lambda = o->xi + n;
 	o->upr = o->lambda + n;
 	o->tren = o->upr + n;
@@ -203,6 +238,10 @@ int osc_init(oscilator_t *o, int n, real_t temp, real_t tren, real_t upr, real_t
 
 void osc_free(oscilator_t *o)
 {
+#ifdef USE_MKL
 	vslDeleteStream(&o->rstr);
+#else
+        gsl_rng_free(o->rstr);
+#endif
 	free(o->xi);
 }

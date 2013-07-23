@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -5,7 +7,25 @@
 #include <float.h>
 
 #include <math.h>
-#include <mkl.h>
+#ifdef USE_MKL
+# include <mkl.h>
+#else
+# include <gsl/gsl_cblas.h>
+
+void vdMul(int n, const double *a, const double *b, double *y)
+{
+   int i;
+   for (i = 0; i < n; ++i)
+     y[i] = a[i] * b[i];
+}
+void vdSqrt(int n, const double *a, double *y)
+{
+   int i;
+   for (i = 0; i < n; ++i)
+     y[i] = sqrt(a[i]);
+}
+
+#endif
 
 #ifdef WIN32
 #define unlink _unlink

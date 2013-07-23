@@ -1,3 +1,4 @@
+#include "config.h"
 #include "etrans.h"
 
 #include <memory.h>
@@ -5,8 +6,14 @@
 #include <stdio.h>
 
 #include <math.h>
-#include <mkl.h>
 #include <float.h>
+
+#ifdef USE_MKL
+# include <mkl.h>
+#else
+# include <gsl/gsl_cblas.h>
+# include <gsl/gsl_rng.h>
+#endif
 
 #ifdef MPI
 #include <mpi.h>
@@ -100,7 +107,11 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, solution_t *r)
 	        if (d->x0rnd) {
 	            osc_x0_rand(&d->osc, d->x);
                 } else {
+#ifdef USE_MKL
 		    viRngUniform(VSL_RNG_METHOD_UNIFORM_STD, d->osc.rstr, 1, &ps, 0, 1000);
+#else
+		    ps = gsl_rng_uniform_int(d->osc.rstr, 1000);
+#endif
 		    osc_equilibrate(&d->osc, osc_h, d->x, ps);
                 }
 		cblas_copy(2 * n, d->x, 1, x, 1);

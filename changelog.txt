@@ -1,3 +1,13 @@
+2013-07-24 Egor Sobolev <egor@impb.psn.ru>
+ * replaced Intel MKL by GSL and LAPACK
+ * added compile-time selection of math library
+ * added selection of compiler
+
+2013-07-22 Egor Sobolev <egor@impb.psn.ru>
+ * added compile-time selection of real type for single trajectory
+   procedures: float or double
+ * added downloading of argtable2 sources in Makefile
+
 2012-11-30 Egor Sobolev <egor@impb.psn.ru>
  * changed the range of "good" approximation from 2.0 to 0.75 * M_PI 
  * unified code for first adjustment of time step and code for

@@ -1,9 +1,22 @@
-CC=icc
+CC=gcc
 
-MKLROOT=/opt/intel/mkl
-MKLLFLAGS= -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a \
-    $(MKLROOT)/lib/intel64/libmkl_sequential.a \
-    $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread
+# icc
+#CFLAGS= -O3
+
+# gcc
+CFLAGS= -O3 -funroll-all-loops -ffast-math -fno-trapping-math
+
+# MATHLIB
+# GSL
+MATHCFLAGS=
+MATHLFLAGS= -llapack -lgsl -lgslcblas 
+
+# MKL
+#MKLROOT=/opt/intel/mkl
+#MATHCFLAGS= -I$(MKLROOT)/include -DUSE_MKL
+#MATHLFLAGS= -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a \
+#    $(MKLROOT)/lib/intel64/libmkl_sequential.a \
+#    $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -limf
 
 # IMPB openmpi
 MPICFLAG = -I/usr/lib/openmpi/include -DMPI
@@ -33,24 +46,24 @@ OBJSRL = $(addprefix .o.serial/,$(SRC:.c=.o))
 all:	serial mpi
 
 serial:	argtable $(OBJSRL)
-	icc -o ../bin/etrans $(OBJSRL) ../argtable2-13/lib/libargtable2.a \
-            $(MKLLFLAGS) -limf -lm
+	$(CC) -o ../bin/etrans $(OBJSRL) ../argtable2-13/lib/libargtable2.a \
+            $(MATHLFLAGS) -lm
 
 mpi:	argtable $(OBJMPI)
-	icc -o ../bin/etrans.MPI $(OBJMPI) ../argtable2-13/lib/libargtable2.a $(MPILFLAG) \
-	    $(MKLLFLAGS) -limf -lm
+	$(CC) -o ../bin/etrans.MPI $(OBJMPI) ../argtable2-13/lib/libargtable2.a $(MPILFLAG) \
+	    $(MATHLFLAGS) -lm
 
 .o.mpi/%.o:	%.c
-	icc -DUSE_STDARG -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_UNISTD_H=1 \
+	$(CC) -DUSE_STDARG -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_UNISTD_H=1 \
 	    -DHAVE_STDARG_H=1 -DUSE_STDARG=1 -DMALLOC_RET_VOID=1 -c \
-	    -I/usr/include/x86_64-linux-gnu \
-	    $(MPICFLAG) -I../argtable2-13/include -I$(MKLROOT)/include -o $@ $<
+	    -I/usr/include/x86_64-linux-gnu $(CFLAGS) $(MPICFLAG) \
+	    -I../argtable2-13/include $(MATHCFLAGS) -o $@ $<
 
 .o.serial/%.o:	%.c
-	icc -DUSE_STDARG -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_UNISTD_H=1 \
+	$(CC) -DUSE_STDARG -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_UNISTD_H=1 \
 	    -DHAVE_STDARG_H=1 -DUSE_STDARG=1 -DMALLOC_RET_VOID=1 -c \
-	    -I/usr/include/x86_64-linux-gnu \
-	    -I../argtable2-13/include -I$(MKLROOT)/include -o $@ $<
+	    -I/usr/include/x86_64-linux-gnu ${CFLAGS} \
+	    -I../argtable2-13/include $(MATHCFLAGS) -o $@ $<
 
 $(OBJMPI):	| .o.mpi
 
