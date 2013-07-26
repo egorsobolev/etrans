@@ -1,3 +1,7 @@
+2013-07-26 Egor Sobolev <egor@impb.psn.ru>
+ * Fixed measurement of the time spent on calculations between control
+   points
+
 2013-07-24 Egor Sobolev <egor@impb.psn.ru>
  * replaced Intel MKL by GSL and LAPACK
  * added compile-time selection of math library

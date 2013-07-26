@@ -457,6 +457,7 @@ int main(int argc, char **argv)
 		elapse += wtm1 - wtm0;
 		if (!rank)
 			printf("%%%% synctime = %.2g, nsamp = %d, elapse = %.2f\n", wtm1 - wtm0, rs.nsamp, elapse);
+		wtm0 = wtm1;
 	}
 	exitcode = 0;
 
