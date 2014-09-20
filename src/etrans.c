@@ -79,8 +79,8 @@ int main(int argc, char **argv)
 	struct arg_dbl *opt_tmax = arg_dbl0("t", NULL, NULL, "trajectory time (600)");
 	struct arg_dbl *opt_h = arg_dbl0("h", NULL, NULL, "time step (0.2)");
 	struct arg_int *opt_na = arg_int0("H", NULL, NULL, "frequency of adaptive step revision (15)");
-        struct arg_int *opt_nq = arg_int0("Q", NULL, NULL, "frequency of quantum frames output (1)");
-	struct arg_int *opt_ns = arg_int0("f", NULL, NULL, "frequency of classic frames output (5)");
+        struct arg_int *opt_nq = arg_int0("Q", NULL, NULL, "frequency of quantum frames output (1), off if 0");
+	struct arg_int *opt_ns = arg_int0("f", NULL, NULL, "frequency of classic frames output (5), off if 0");
 	struct arg_dbl *opt_temp = arg_dbl0("T", NULL, NULL, "T - temperature, K (300)");
 	struct arg_dbl *opt_fric = arg_dbl0("F", NULL, NULL, "gamma - friction (6.0e-3)");
 	struct arg_dbl *opt_elas = arg_dbl0("E", NULL, NULL, "omega0^2 - elastic (1.0e-4)");
@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 	        opt_outfn, end
 	};
 	char *seq, *progname = "etrans", *fntmp;
-        int sol_size, m, m1, s, n, nstep, nsamp, nskip, exitcode, nerrors, qn, i, heat_nstep;
+        int sol_size, m, m1, s, n, nstep, nsamp, exitcode, nerrors, qn, i, heat_nstep;
 	size_t fnlen, fcnt;
 	real_t h, tmax, heat_h, upr, mu;
 	double *rbuf, wtm0, wtm1, elapse, droptime, k1, k2;
@@ -186,8 +186,7 @@ int main(int argc, char **argv)
 
 	tmax = (real_t) opt_tmax->dval[0];
 	h = (real_t) opt_h->dval[0];
-        nskip = opt_nq->ival[0];
-	nstep = (int) ceil(tmax / (h * nskip));
+	nstep = (int) ceil(tmax / h);
 	nsamp = opt_nsamp->ival[0];
 
 	if (opt_prm->count > 0) {
@@ -229,15 +228,17 @@ int main(int argc, char **argv)
 	d.half = (n - 1) / 2;
 	d.sv = (real_t) opt_lambda->dval[0];
         d.h_revstep = opt_na->ival[0];
-        d.q_outstep = nskip;
         d.x0rnd = (opt_nxt->count == 0);
 
-	d.osc_outstep = opt_ns->ival[0];
-	/* d.osc_nskip = (int) (1.0f / h + .5); */
-	d.osc_h = h * d.osc_outstep;
-	d.osc_nstep = (int) floor(tmax / d.osc_h);
+        d.q_outstep = opt_nq->ival[0] ? opt_nq->ival[0] : nstep;
+        d.q_h = h * d.q_outstep;
+	d.q_nstep = nstep / d.q_outstep;
 
-	m = n * (nstep + 1);
+        d.osc_outstep = opt_ns->ival[0] ? opt_ns->ival[0] : nstep;
+        d.osc_h = h * d.osc_outstep;
+	d.osc_nstep = nstep / d.osc_outstep;
+
+	m = n * (d.q_nstep + 1);
 	s = n * (d.osc_nstep + 1);
 	m1 = m + 3 * (nstep + 1) + s;
 	sol_size = 2 * m1;
@@ -305,18 +306,18 @@ int main(int argc, char **argv)
 	/* these fields arn't modified */
 	if (!rank) {
 		rs.nstep = nstep;
-		rs.h = h * nskip;
+		rs.h = h;
 		rs.n = n;
-		rs.o_h = d.osc_h;
-		rs.o_nstep = d.osc_nstep;
+		rs.pos = d.q_outstep;
+		rs.uos = d.osc_outstep;
 	}   
 	ri.n = n;
-	ri.h = h * nskip;
+	ri.h = h;
 	ri.nstep = nstep;
-	ri.o_h = d.osc_h;
-	ri.o_nstep = d.osc_nstep;
+        ri.pos = d.q_outstep;
+        ri.uos = d.osc_outstep;
 
-	/* read file if contunue or reset rs */
+        /* read file if contunue or reset rs */
 	if (opt_rst->count > 0) {
 		if (!rank) {
 			f = fopen(opt_outfn->filename[0], "rb");

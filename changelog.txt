@@ -1,5 +1,11 @@
+2014-01-21 Egor Sobolev <egor@impb.psn.ru>
+ * removed output step for charge transfer functionals. it is just equal
+   to the time step (-h)
+ * zero value of -Q and -f produce only initial and final frames of
+   probability and displacments
+ 
 2013-07-26 Egor Sobolev <egor@impb.psn.ru>
- * Fixed measurement of the time spent on calculations between control
+ * fixed measurement of the time spent on calculations between control
    points
 
 2013-07-24 Egor Sobolev <egor@impb.psn.ru>

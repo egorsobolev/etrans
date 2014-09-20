@@ -32,17 +32,17 @@ int solution_read(FILE *f, solution_t *rs)
 		return -1;
 	}
 	fcnt = fread(&n, sizeof(int), 1, f);
-	if (fcnt != 1|| rs->o_nstep != n) {
-		printf("etrans: number of oscilator steps in restart is absent or different. stop.\n");
+	if (fcnt != 1|| rs->pos != n) {
+		printf("etrans: frequency of probability output in restart is absent or different. stop.\n");
 		return -1;
 	}
-	fcnt = fread(&h, sizeof(float), 1, f);
-	if (fcnt != 1 || fabsf(rs->o_h - h) > FLT_EPSILON) {
-		printf("etrans: time step for oscilator in restart is absent or different. stop.\n");
+	fcnt = fread(&n, sizeof(int), 1, f);
+	if (fcnt != 1 || rs->uos != n) {
+		printf("etrans: frequence of displacments output in restart is absent or different. stop.\n");
 		return -1;
 	}
 
-        sol_size = 2 * (rs->n * (rs->nstep + rs->o_nstep + 2) + 3 * rs->nstep + 3);
+        sol_size = 2 * (rs->n * (rs->nstep / rs->pos + rs->nstep / rs->uos + 2) + 3 * rs->nstep + 3);
 	fcnt = fread(rs->p, sizeof(double), sol_size, f);
 	if (fcnt != sol_size) {
 		printf("etrans: cannot read data from restart file.\n");
@@ -70,13 +70,13 @@ int solution_write(FILE *f, solution_t *rs)
 	fcnt = fwrite(&rs->h, sizeof(float), 1, f);
 	if (fcnt != 1) return -1;
 
-	fcnt = fwrite(&rs->o_nstep, sizeof(int), 1, f);
+	fcnt = fwrite(&rs->pos, sizeof(int), 1, f);
 	if (fcnt != 1) return -1;
 
-	fcnt = fwrite(&rs->o_h, sizeof(float), 1, f);
+	fcnt = fwrite(&rs->uos, sizeof(int), 1, f);
 	if (fcnt != 1) return -1;
 
-        sol_size = 2 * (rs->n * (rs->nstep + rs->o_nstep + 2) + 3 * rs->nstep + 3);
+        sol_size = 2 * (rs->n * (rs->nstep / rs->pos + rs->nstep / rs->uos + 2) + 3 * rs->nstep + 3);
 	fcnt = fwrite(rs->p, sizeof(double), sol_size, f);
 	if (fcnt != sol_size) return -1;
 

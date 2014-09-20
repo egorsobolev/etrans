@@ -49,7 +49,7 @@ void clapack_dstevx(char jobz, char range, int n, double *d, double *e,
 
 int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, solution_t *r)
 {
-	int nstep, nskip, osc_n1, n, i, j, jn, ln, k, l, m, q, qn, tn, t, neigs, info, ps;
+	int nstep, nskip, n, i, j, jn, ln, k, l, m, q, qn, tn, t, neigs, info, ps;
 	real_t p2, w, abstol, a, b, t0, sn, cs, h0, hmax, normp, mn, mx, nr, osc_period, osc_h;
 	real_t *u, *v, *s0, *d0, *ds, *dk, *s0r, *s0i, *tr, *ti, *work, *wa, *b2l, *b2r, *b2t, *x;
         real_t *sr, *si, *dsr, *dsi, *d2sr, *d2si;
@@ -63,12 +63,11 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, solution_t *r)
 #endif
 
 	abstol = 2.0 * clapack_lamch('S');
-	osc_n1 = d->osc_nstep - 1;
 
 	qn = r->nsamp + nsamp;
 	n = d->n;
-        r->nstep = (int) ceil(tmax / (h * d->q_outstep));
-	nstep = r->nstep * d->q_outstep;
+        r->nstep = (int) ceil(tmax / h);
+	nstep = r->nstep;
 	r->n = n;
 
 	d0 = (real_t *) malloc(24 * n * sizeof(real_t) + 5 * n * sizeof(int));
@@ -152,7 +151,7 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, solution_t *r)
 		mn = REAL_MAX;
 		mx = 0.0;
 
-		jn = d->osc_outstep;
+	        jn = d->osc_outstep;
 	        tn = d->q_outstep;
 	        ln = 0;
 		j = 0;
@@ -160,7 +159,8 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, solution_t *r)
 		/**********************/
 
 		/* cycle by classical steps */
-		for (i = 0; i < nstep; ++i) {
+	        i = 0;
+		while (i < nstep) {
 
 		        if (!ln) {
 				/* d0 = d + u(j) */
@@ -185,7 +185,7 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, solution_t *r)
 				b = wa[0];
 
 				hmax = 0.75 * M_PI / (a > b ? a : b);
-				if (hmax > d->osc_h) hmax = d->osc_h;
+				/*if (hmax > d->osc_h) hmax = d->osc_h;*/
 				nskip = h > hmax ? (int) ceil(h / hmax) : 1;
 				h0 = h / nskip;
 				if (h0 > mx) mx = h0;
@@ -251,33 +251,16 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, solution_t *r)
 			b2t = b2l;
 			b2l = b2r;
 			b2r = b2t;
+		   
+		   
 		     
 		        --tn;
 		        if (!tn) {
                            ++t;
-			   
-			   diff_b(d, sr, x, dsr, d2sr);
-			   c = 0.0;
-			   dc = 0.0;
-			   d2c = 0.0;
 			   for (k = 0; k < n; ++k) {
-			      a = b2l[k];
-			      b = (real_t) k - d->half;
-			      b = b * b;
-			      c += (double) a * b;
-			      b *= 2.0;
-			      dc += (double) (sr[k] * dsr[k] + si[k] * dsi[k]) * b;
-			      d2c += (double) (dsr[k] * dsr[k] + dsi[k] * dsi[k] + sr[k] * d2sr[k] + si[k] * d2si[k]) * b;
-			      r->p[k + t * n] += (double) a;
-			      r->p2[k + t * n] += (double) a * a;
+			      r->p[k + t * n] += (double) b2l[k];
+			      r->p2[k + t * n] += (double) b2l[k] * b2l[k];
 			   } 
-			   r->c[t] += c;
-			   r->dc[t] += dc;
-			   r->d2c[t] += d2c;
-			   r->c2[t] += c * c;
-			   r->dc2[t] += dc * dc;
-			   r->d2c2[t] += d2c * d2c;
-			   
 			   tn = d->q_outstep;
 			}
 		   
@@ -291,6 +274,26 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, solution_t *r)
 				jn = d->osc_outstep;
 			}		   
 		        --ln;
+		        ++i;
+		   
+		           diff_b(d, sr, x, dsr, d2sr);
+		           c = 0.0;
+			   dc = 0.0;
+			   d2c = 0.0;
+			   for (k = 0; k < n; ++k) {
+			      b = (real_t) k - d->half;
+			      b = b * b;
+			      c += (double) b2l[k] * b;
+			      b *= 2.0;
+			      dc += (double) (sr[k] * dsr[k] + si[k] * dsi[k]) * b;
+			      d2c += (double) (dsr[k] * dsr[k] + dsi[k] * dsi[k] + sr[k] * d2sr[k] + si[k] * d2si[k]) * b;
+			   }
+			   r->c[i] += c;
+			   r->dc[i] += dc;
+			   r->d2c[i] += d2c;
+			   r->c2[i] += c * c;
+			   r->dc2[i] += dc * dc;
+			   r->d2c2[i] += d2c * d2c;
 		}
 		wtm1 = walltime();
 		if (!rank) {

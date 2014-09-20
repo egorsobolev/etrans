@@ -67,6 +67,8 @@ struct EQDATA
 	int n;
 	int half;
         int h_revstep;
+        real_t q_h;
+        int q_nstep;
         int q_outstep;
         int x0rnd;
 	real_t sv;
@@ -88,8 +90,8 @@ struct SOLUTION
 	int nstep;
 	int nsamp;
 	float h;
-	int o_nstep;
-	float o_h;
+        int pos;
+        int uos;
 	double *p;
 	double *c;
 	double *dc;
