@@ -1,3 +1,9 @@
+2014-10-25 Egor Sobolev <egor@impb.psn.ru>
+ * release of an abstract interface to the classical subsystem
+ * added wrapping interface for random streams
+ * hiding implementation of options processing
+ * structuring the code of the main loop of integration
+
 2014-01-21 Egor Sobolev <egor@impb.psn.ru>
  * removed output step for charge transfer functionals. it is just equal
    to the time step (-h)

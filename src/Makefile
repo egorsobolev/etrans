@@ -8,21 +8,21 @@ CFLAGS= -O3 -funroll-all-loops -ffast-math -fno-trapping-math
 
 # MATHLIB
 # GSL
-MATHCFLAGS=
-MATHLFLAGS= -llapack -lgsl -lgslcblas 
+#MATHCFLAGS=
+#MATHLFLAGS= -llapack -lgsl -lgslcblas 
 
 # MKL
-#MKLROOT=/opt/intel/mkl
-#MATHCFLAGS= -I$(MKLROOT)/include -DUSE_MKL
-#MATHLFLAGS= -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a \
-#    $(MKLROOT)/lib/intel64/libmkl_sequential.a \
-#    $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -limf
+MKLROOT=/opt/intel/mkl
+MATHCFLAGS= -I$(MKLROOT)/include -DUSE_MKL
+MATHLFLAGS= -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a \
+    $(MKLROOT)/lib/intel64/libmkl_sequential.a \
+    $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -limf
 
 # IMPB openmpi
 MPICFLAG = -I/usr/lib/openmpi/include -DMPI
 MPILFLAG = -L/usr/lib/openmpi/lib -lmpi -lopen-rte -lopen-pal -ldl \
     -Wl,--export-dynamic -lnsl -lutil -ldl
-    
+
 # IMPB mpich2
 #MPICFLAG = -I/usr/include/mpich2 -DMPI
 #MPILFLAG = -L/usr/lib -lmpich -lopa -lmpl -lrt -lcr -lpthread
@@ -86,7 +86,7 @@ argtable:	| ../argtable2-13
 	    make install; \
 	    cd ../src; \
 	)
-	
+
 ../argtable2-13.tar.gz:
 	( \
 	    cd ..; \
