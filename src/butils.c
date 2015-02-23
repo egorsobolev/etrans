@@ -4,15 +4,17 @@
 #include <malloc.h>
 #include <stdio.h>
 
-void diff_b(charge_eq_t *ch, real_t *b, real_t *u, real_t *db, real_t *d2b)
+void diff_b(charge_eq_t *ch, real_t *b, real_t *db, real_t *d2b)
 {
   int n, n1, i;
-  real_t *x, *y, *dx, *dy, *d2x, *d2y, *v;
+  real_t *x, *y, *dx, *dy, *d2x, *d2y, *v, *u;
   n = ch->n;
   n1 = n - 1;
   v = u + n;
   x = b;
-  y = b + n;
+  y = x + n;
+  u = y + n;
+  v = u + n;
   dx = db;
   dy = db + n;
   d2x = d2b;

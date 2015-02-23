@@ -1,6 +1,9 @@
 #include "config.h"
 
 #include "osc.h"
+#include "pbd.h"
+
+#include "sol.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -46,26 +49,73 @@ void vdSqrt(int n, const double *a, double *y)
 #include "etrans.h"
 #include "opt.h"
 
+
+int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res);
+
+int eq_read_head(eqdata_t *d, FILE *f)
+{
+  if (fread(&d->n, sizeof(int), 1, f) != 1)
+    return -1;
+  if (fread(&d->nstep, sizeof(long), 1, f) != 1)
+    return -1;
+  if (fread(&d->nskip, sizeof(int), 1, f) != 1)
+    return -1;
+  if (fread(&d->h, sizeof(real_t), 1, f) != 1)
+    return -1;
+  return 0;
+}
+int etrans_write(const eqdata_t *d, const sol_t *si, int ndone, const double *ss, FILE *f)
+{
+  if (fwrite(&d->n, sizeof(int), 1, f) != 1)
+    return -1;
+  if (fwrite(&d->nstep, sizeof(long), 1, f) != 1)
+    return -1;
+  if (fwrite(&d->nskip, sizeof(int), 1, f) != 1)
+    return -1;
+  if (fwrite(&d->h, sizeof(real_t), 1, f) != 1)
+    return -1;
+
+  if (d->chain->write(d->chain, f))
+    return -1;
+
+  if (charge_write(d->ch, f))
+    return -1;
+
+  if (fwrite(&ndone, sizeof(int), 1, f) != 1)
+    return -1;
+  if (sol_write_meta(f, si->nfunc, si->m))
+    return -1;
+  if (fwrite(si->nb, sizeof(int), si->nfunc, f) != si->nfunc)
+    return -1;
+  if (fwrite(ss, sizeof(double), si->numel, f) != si->numel)
+    return -1;
+
+  return 0;
+}
+
 int main(int argc, char **argv)
 {
   etrans_opt_t opt;
   void **argtable;
   char *seq, *progname = "etrans", *fntmp;
-  int sol_size, m, m1, s, n, nstep, nsamp, exitcode, nerrors, qn, i, heat_nstep;
+  int nsamp, exitcode, nerrors, qn, i, heat_nstep, nfunc, ndone, n0;
   size_t fnlen, fcnt;
-  real_t h, tmax, heat_h, upr, mu;
-  double *rbuf, wtm0, wtm1, elapse, droptime, k1, k2;
+  real_t tmax, heat_h;
+  double *rbuf, wtm0, wtm1, elapse, droptime;
   eqdata_t d;
-  solution_t rs, ri;
+  sol_meta_t sol_meta[MAX_FUNC];
+  sol_t *si;
+  double *ss;
   FILE *f;
   int rank, np;
-  charge_eq_t ch;
+  int rst;
+  charge_parm_t charge_parm;
+  char mdl[4];
 
   argtable = argtable_mk(&opt);
   if (!argtable) {
     fprintf(stderr, "%s: insufficient memory\n", progname);
-    exit(-7);
-
+    exit(-1);
   }
   nerrors = arg_parse(argc, argv, argtable);
 
@@ -86,13 +136,13 @@ int main(int argc, char **argv)
   if (nerrors > 0) {
     arg_print_errors(stderr, opt.end, progname);
     fprintf(stderr, "Try '%s --help' for more information.\n", progname);
-    exitcode = -8;
+    exitcode = -2;
     goto exit;
   }
   if (opt.logfn->count > 0) {
     if (!freopen(opt.logfn->filename[0], "w", stdout)) {
       fprintf(stderr, "%s: can't open log file.\n", progname);
-      exitcode = -11;
+      exitcode = -3;
       goto exit;
     }
   }
@@ -112,88 +162,234 @@ int main(int argc, char **argv)
     options_print(argc, argv);
     printf("\n");
   }
-
-  tmax = (real_t) opt.tmax->dval[0];
-  h = (real_t) opt.h->dval[0];
-  nstep = (int) ceil(tmax / h);
-  nsamp = opt.nsamp->ival[0];
-
-  if (opt.prmfn->count > 0) {
-    f = fopen(opt.prmfn->filename[0], "r");
-    if (!f) {
-      fprintf(stderr, "%s: can't open file of quantum parameters.\n", progname);
-      exitcode = -13;
-      goto exit;
-    }
-    fcnt = readparm(f);
-    fclose(f);
-    if (fcnt) {
-      fprintf(stderr, "%s: can't read quantum parameters.\n", progname);
-      exitcode = -14;
-      goto exit;
-    }
-  }
-
-  f = fopen(opt.seqfn->filename[0], "r");
-  if (!f) {
-    fprintf(stderr, "%s: can't open sequence file.\n", progname);
-    exitcode = -9;
-    goto exit;
-  }
-  n = seqscan(f, &seq);
-  fclose(f);
-  if (!n) {
-    fprintf(stderr, "%s: empty sequence, just quit.\n", progname);
-    exitcode = 0;
-    goto exit0;
-  } else if (n < 0) {
-    fprintf(stderr, "%s: insufficient memory\n", progname);
-    exitcode = -1;
-    goto exit0;
-  }
-
-  if (charge_init(&ch, n, (real_t) opt.chi->dval[0])) {
-    fprintf(stderr, "%s: insufficient memory\n", progname);
-    exitcode = -2;
+  if (rnd_init()) {
+    fprintf(stderr, "%s: initialazation of random generator failed.\n", progname);
+    exitcode = -4;
     goto exit1;
   }
-  if (seqdna(n, seq, ch.d, ch.s)) {
-    fprintf(stderr, "%s: invalid symbol in sequence\n", progname);
-    exitcode = -2;
-    goto exit15;
+
+  rst = opt.rst->count;
+
+  if (rst) {
+    seq = NULL;
+
+    f = fopen(opt.outfn->filename[0], "rb");
+    if (!f) {
+      fprintf(stderr, "%s: can't open output/restart file.\n", progname);
+      exitcode = -7;
+      goto exit2;
+    }
+    /* read head */
+    if (eq_read_head(&d, f)) {
+      fprintf(stderr, "%s: can't read output file.\n", progname);
+      exitcode = -8;
+      goto exit2;
+    }
+    tmax = d.h * d.nstep * d.nskip;
+    /* read chain */
+    if (fread(mdl, sizeof(char), 3, f) != 3) {
+      fprintf(stderr, "%s: can't read output file.\n", progname);
+      exitcode = -8;
+      goto exit2;
+    }
+  } else {
+    /* read sequence */
+    if (!opt.seqfn->count) {
+      fprintf(stderr, "-s <file> or -c must be in line\n");
+      fprintf(stderr, "Try '%s --help' for more information.\n", progname);
+      exitcode = -2;
+      goto exit2;
+    }
+    f = fopen(opt.seqfn->filename[0], "r");
+    if (!f) {
+      fprintf(stderr, "%s: can't open sequence file.\n", progname);
+      exitcode = -5;
+      goto exit2;
+    }
+    d.n = seqscan(f, &seq);
+    fclose(f);
+    if (!d.n) {
+      fprintf(stderr, "%s: empty sequence, just quit.\n", progname);
+      exitcode = 0;
+      goto exit2;
+    } else if (d.n < 0) {
+      fprintf(stderr, "%s: insufficient memory to allocate sequence.\n", progname);
+      exitcode = -6;
+      goto exit2;
+    }
+    /* init head */
+    tmax = (real_t) opt.tmax->dval[0];
+    d.h = (real_t) opt.h->dval[0];
+    d.nskip = opt.no->ival[0];
+    d.nstep = (long) ceil(tmax / d.nskip / d.h);
+    /* read solution sheme */
+    if (opt.outsh->count) {
+      f = fopen(opt.outsh->filename[0], "rt");
+      if (!f) {
+	fprintf(stderr, "%s: can't open file of output sheme.\n", progname);
+	exitcode = -5;
+	goto exit3;
+      }
+      nfunc = sol_scan_meta(f, sol_meta);
+      if (nfunc < 0) {
+	fprintf(stderr, "%s: invalid format of output sheme file.\n", progname);
+	exitcode = -5;
+	goto exit3;
+      }
+      fclose(f);
+    } else {
+      nfunc = sol_default_meta(sol_meta);
+    }
+
+    strncpy(mdl, opt.mdl->sval[0], 3);
   }
-  ch.h_revstep = opt.na->ival[0];
-  d.ch = &ch;
+  mdl[3] = '\0';
 
-  d.n = n;
-  d.half = (n - 1) / 2;
-  /*  d.sv = (real_t) opt.chi->dval[0];*/
+  nsamp = opt.nsamp->ival[0];
+
+  if (!strcmp(mdl, "OSC")) {
+    d.chain = (chain_eq_t *) mk_osc(d.n);
+    d.charge_parm = &osc_charge_defs;
+  } else if (!strcmp(mdl, "PBD")) {
+    d.chain = (chain_eq_t *) mk_pbd(d.n);
+    d.charge_parm = &pbd_charge_defs;
+  } else
+    d.chain = NULL;
+
+  if (!d.chain) {
+    fprintf(stderr, "%s: insufficient memory\n", progname);
+    exitcode = -11;
+    goto exit2;
+  }
+  if (rst) {
+    /* !!! what do with seq? !!! */
+    if (d.chain->read(d.chain, f)) {
+      fprintf(stderr, "%s: chain read error\n", progname);
+      exitcode = -13;
+      goto exit4;
+    }
+  } else {
+    if (d.chain->init(d.chain, &opt)) {
+      fprintf(stderr, "%s: chain init error\n", progname);
+      exitcode = -12;
+      goto exit4;
+    }
+    /* read quantum parameters from file */
+    if (opt.prmfn->count > 0) {
+      f = fopen(opt.prmfn->filename[0], "r");
+      if (!f) {
+	fprintf(stderr, "%s: can't open file of quantum parameters.\n", progname);
+	exitcode = -9;
+	goto exit4;
+      }
+      fcnt = readparm(f, &charge_parm);
+      fclose(f);
+      if (fcnt) {
+	fprintf(stderr, "%s: can't read quantum parameters.\n", progname);
+	exitcode = -10;
+	goto exit4;
+      }
+      charge_parm.chi = d.charge_parm->chi;
+      charge_parm.lambda = d.charge_parm->lambda;
+      d.charge_parm = &charge_parm;
+    }
+  }
+
+  /* make charge equation strucutres */
+  if (opt.n0->count) {
+    n0 = opt.n0->ival[0];
+    if (n0 < 0 || n0 >= d.n) {
+      fprintf(stderr, "%s: the origin must be inside the chain.\n", progname);
+      exitcode = -106;
+      goto exit4;
+    }
+  } else
+    n0 = (d.n - 1) / 2;
+  
+  d.ch = mk_charge(d.n, n0, d.charge_parm);
+  if (!d.ch) {
+    fprintf(stderr, "%s: insufficient memory\n", progname);
+    exitcode = -14;
+    goto exit4;
+  }
+  if (rst) {
+    /* read charge */
+    if (charge_read(d.ch, f)) {
+      fprintf(stderr, "%s: charge read error\n", progname);
+      exitcode = -17;
+      goto exit5;
+    }
+    if (fread(&ndone, sizeof(int), 1, f) != 1) {
+      fprintf(stderr, "%s: nsamp read error\n", progname);
+      exitcode = -118;
+      goto exit5;
+    }
+    nfunc = sol_read_meta(f, sol_meta);
+    if (nfunc <= 0) {
+      fprintf(stderr, "%s: output sheme read error\n", progname);
+      exitcode = -119;
+      goto exit5;
+    }
+    fseek(f, nfunc * sizeof(int), SEEK_CUR);
+  } else {
+    /* init charge */
+    if (seqdna(d.charge_parm, d.n, seq, d.ch->d, d.ch->s)) {
+      fprintf(stderr, "%s: invalid symbol in sequence\n", progname);
+      exitcode = -15;
+      goto exit5;
+    }
+    if (charge_init(d.ch, &opt)) {
+      fprintf(stderr, "%s: charge init error\n", progname);
+      exitcode = -16;
+      goto exit5;
+    }
+    ndone = 0;
+  }
   d.h_revstep = opt.na->ival[0];
-  d.x0rnd = (opt.nxt->count == 0);
 
-  d.q_outstep = opt.nq->ival[0] ? opt.nq->ival[0] : nstep;
-  d.q_h = h * d.q_outstep;
-  d.q_nstep = nstep / d.q_outstep;
+  si = mk_sol(nfunc, sol_meta, d.n, d.nstep);
+  sol_print_meta(stdout, nfunc, sol_meta);
+  printf("nsamp: %d\n", ndone);
+  if (!si) {
+    fprintf(stderr, "%s: insufficient memory to allocate output fuctional\n", progname);
+    goto exit5;
+  }
+  if (!rank) {
+    ss = calloc(si->numel, sizeof(double));
+    if (!ss) {
+      fprintf(stderr, "%s: insufficient memory to allocate the summation buffer\n", progname);
+      goto exit6;
+    }
+  } else
+    ss = NULL;
 
-  d.osc_outstep = opt.ns->ival[0] ? opt.ns->ival[0] : nstep;
-  d.osc_h = h * d.osc_outstep;
-  d.osc_nstep = nstep / d.osc_outstep;
-
-  m = n * (d.q_nstep + 1);
-  s = n * (d.osc_nstep + 1);
-  m1 = m + 3 * (nstep + 1) + s;
-  sol_size = 2 * m1;
+  if (rst) {
+    if (!rank) {
+      if (fread(ss, sizeof(double), si->numel, f) != si->numel) {
+	fprintf(stderr, "%s: solution read error\n", progname);
+	exitcode = -19;
+	goto exit7;
+      }
+    }
+    fclose(f);
+  } else {
+    if (!rank)
+      memset(ss, 0, si->numel * sizeof(double));
+  }
 
   fnlen = strlen(opt.outfn->filename[0]);
 
-  d.x = (real_t *) malloc(6 * n * sizeof(real_t) + fnlen + 1);
-  if (!d.x) {
-    printf("%s: insufficient memory\n", progname);
-    exitcode = -1;
-    goto exit15;
+  if (opt.initfn->count) {
+    fntmp = (char *) malloc(4 * d.n * sizeof(real_t) + fnlen + 1);
+  } else {
+    fntmp = (char *) malloc(fnlen + 1);
   }
-  d.x0 = d.x + 2 * n;
-  fntmp = (char *) (d.x0 + 4 * n);
+  if (!fntmp) {
+    printf("%s: insufficient memory\n", progname);
+    exitcode = -20;
+    goto exit7;
+  }
+  d.x0 = (real_t *) (fntmp + fnlen + 1);
 
   strcpy(fntmp, opt.outfn->filename[0]);
   fntmp[fnlen - strlen(opt.outfn->basename[0])] = '$';
@@ -202,147 +398,47 @@ int main(int argc, char **argv)
     f = fopen(opt.initfn->filename[0], "r");
     if (!f) {
       fprintf(stderr, "%s: can't open initial state file.\n", progname);
-      exitcode = -17;
-      goto exit2;
+      exitcode = -21;
+      goto exit8;
     }
-    exitcode = b0_read(f, n, d.x0);
+    exitcode = b0_read(f, d.n, d.x0);
     fclose(f);
     if (exitcode) {
       fprintf(stderr, "%s: can't read initial state\n", progname);
-      exitcode = -17;
-      goto exit2;
+      exitcode = -22;
+      goto exit8;
     }
   } else {
-    memset(d.x0, 0, 4 * n * sizeof(real_t));
-    d.x0[d.half] = 1.0f;
+    d.x0 = NULL;
   }
+
+  d.chain->equilibrate(d.chain);
+
+  printf("       n:%-10d         n0:%-10d \n", d.n, d.ch->n0);
   /*
-    cblas_sscal(n - 1, h, d.s0, 1);
+  goto exit7;
   */
-  upr = (real_t) opt.omega0->dval[0];
-  mu = (real_t) ((opt.mu->count) ? opt.mu->dval[0] : opt.chi->dval[0]);
-  /*
-  if (osc_init(&d.osc, n,
-	       (real_t) opt.temp->dval[0], (real_t) opt.gamma->dval[0],
-	       upr, (real_t) opt.xi->dval[0],
-	       (real_t) opt.mu->dval[0])) {
-    fprintf(stderr, "%s: insufficient memory\n", progname);
-    exitcode = -3;
-    goto exit2;
-  }
-  */
-  d.chain = (chain_eq_t *) osc_init(n, (real_t) opt.temp->dval[0], (real_t) opt.gamma->dval[0],
-		     upr, (real_t) opt.xi->dval[0], (real_t) opt.mu->dval[0]);
-  if (!d.chain) {
-    fprintf(stderr, "%s: insufficient memory\n", progname);
-    exitcode = -3;
-    goto exit2;
-  }
-
-  if (solution_allocate(m, nstep, s, &ri, rank ? NULL : &rs, &rbuf)) {
-    fprintf(stderr, "%s: insufficient memory\n", progname);
-    exitcode = -4;
-    goto exit3;
-  }
-
-  /* these fields arn't modified */
-  if (!rank) {
-    rs.nstep = nstep;
-    rs.h = h;
-    rs.n = n;
-    rs.pos = d.q_outstep;
-    rs.uos = d.osc_outstep;
-  }   
-  ri.n = n;
-  ri.h = h;
-  ri.nstep = nstep;
-  ri.pos = d.q_outstep;
-  ri.uos = d.osc_outstep;
-
-  /* read file if contunue or reset rs */
-  if (opt.rst->count > 0) {
-    if (!rank) {
-      f = fopen(opt.outfn->filename[0], "rb");
-      if (!f) {
-	fprintf(stderr, "%s: can't open restart file.\n", progname);
-	exitcode = -11;
-	goto exit4;
-      }
-      exitcode = solution_read(f, &ri);
-      fclose(f);
-      if (exitcode) {
-	fprintf(stderr, "%s: can't read solution\n", progname);
-	exitcode = -11;
-	goto exit4;
-      }
-      rs.nsamp = ri.nsamp;
-      vdMul(sol_size, ri.p, ri.p, rs.p);
-      cblas_dscal(m1, (double) rs.nsamp - 1.0, rs.p2, 1);
-      cblas_daxpy(m1, (double) rs.nsamp, rs.p, 1, rs.p2, 1);
-      cblas_dcopy(m1, ri.p, 1, rs.p, 1);
-      cblas_dscal(m1, (double) rs.nsamp, rs.p, 1);
-    }
-  } else {
-    if (!rank) {
-      memset(rs.p, 0, sol_size * sizeof(double));
-      rs.nsamp = 0;
-    }
-  }
-  if (d.x0rnd) {
-    if (!rank)
-      printf("Langevin inizialization mode: random\n\n");
-  } else {
-    if (opt.hh->count > 0)
-      heat_h = (real_t) opt.hh->dval[0];
-    else
-      heat_h = d.chain->period / 1000.0;
-    heat_nstep = opt.nh->ival[0];
-
-    d.chain->x0(d.chain, d.x);
-    if (!rank) {
-      printf("Langevin initialization mode: continue\n\n");
-      printf("Langevin initial distibution:\n");
-      /*
-      if (d.osc.kt > 0.0f) {
-	k1 = 1.0f / sqrtf(0.5f * n * d.osc.kt);
-	printf(" sqrt(2<u^2>w0^2/kT) = %f\n", k1 * cblas_nrm2(n, d.x, 1) / _sqrt(upr));
-	printf(" sqrt(2<v^2>/kT) = %f\n", k1 * cblas_nrm2(n, d.x + n, 1) );
-      } else {
-	printf(" u[i] = 0, v[i] = 0\n");
-      }
-      */
-      if (heat_nstep > 0) {
-	printf("\nheating trajectory:\n");
-	printf(" h = %f, t = %f\n", heat_h, heat_h * heat_nstep);
-      }
-      printf("\n");
-      fflush(stdout);
-    }
-    d.chain->equilibrate(d.chain, heat_h, d.x, heat_nstep, 0);
-  }
-   
 
   if (!rank) {
-    printf("     #      t,s max|P2-1|    min(h)    max(h)     <u^2>     <v^2>\n");
+    printf("     #      t,s max|P2-1|    min(h)    max(h)        Ek        Ep\n");
     fflush(stdout);
   }
 
   droptime = 60.0 * opt.drp->dval[0];
   i = nsamp;
-  qn = (int) (REFERENCE_OPS * droptime * h / (tmax * n) + 0.5);
+  qn = (int) (REFERENCE_OPS * droptime * d.h / (tmax * d.n) + 0.5);
   if (qn < 1) qn = 1;
   else
     if (qn > i) qn = i;
   wtm0 = walltime();
   while (i) {
     /* reset partial statistics */
-    memset(ri.p, 0, sol_size * sizeof(double));
-    ri.nsamp = 0;
+    sol_setzero(si);
     /* solve quantum equation qn times */
-    if (eq(&d, h, tmax, qn, &ri)) {
+    if (eq(&d, d.h, tmax, qn, si)) {
       fprintf(stderr, "%s: insufficient memory\n", progname);
-      exitcode = -5;
-      goto exit4;
+      exitcode = -23;
+      goto exit8;
     }
     i -= qn;
     wtm1 = walltime();
@@ -353,43 +449,36 @@ int main(int argc, char **argv)
       if (qn > i) qn = i;
     wtm0 = wtm1;
 #ifdef MPI
-    MPI_Reduce(ri.p, rbuf, sol_size, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    if (rank) {
+      MPI_Reduce(si->r, NULL, si->numel, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+      MPI_Reduce(&si->nsamp, NULL, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    } else {
+      MPI_Reduce(MPI_IN_PLACE, si->r, si->numel, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+      MPI_Reduce(MPI_IN_PLACE, &si->nsamp, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    }
 #endif
     if (!rank) {
-      cblas_daxpy(sol_size, 1.0, rbuf, 1, rs.p, 1);
-      rs.nsamp += ri.nsamp * np;
+      cblas_dscal(si->numel, ndone, ss, 1);
+      cblas_daxpy(si->numel, 1.0, si->r, 1, ss, 1);
+      ndone += si->nsamp;
+      /*si->nsamp = ndone;*/
+      cblas_dscal(si->numel, 1.0 / ndone, ss, 1);
 
-      k1 = 1.0 / rs.nsamp; 
-      /* calc std */
-      if (rs.nsamp > 1) {
-	k2 = 1.0 / (rs.nsamp - 1.0);
-	vdMul(m1, rs.p, rs.p, ri.p);
-	cblas_dscal(m1, -k1 * k2, ri.p, 1);
-	cblas_daxpy(m1, k2, rs.p2, 1, ri.p, 1);
-	vdSqrt(m1, ri.p, ri.p2);
-      } else {
-	memset(ri.p2, 0, m1 * sizeof(double));
-      }
-      /* calc mean */
-      cblas_dcopy(m1, rs.p, 1, ri.p, 1);
-      cblas_dscal(m1, k1, ri.p, 1);
-
-      ri.nsamp = rs.nsamp;
 
       f = fopen(fntmp, "wb");
       if (!f) {
 	fprintf(stderr, "%s: can't reset output file.\n", progname);
-	exitcode = -12;
-	goto exit4;
+	exitcode = -24;
+	goto exit8;
       }
-      exitcode = solution_write(f, &ri);
+      exitcode = etrans_write(&d, si, ndone, ss, f);
       if (!exitcode)
 	exitcode = options_write(f, argc, argv);
       fclose(f);
       if (exitcode) {
 	fprintf(stderr, "%s: can't write results.\n", progname);
-	exitcode = -12;
-	goto exit4;
+	exitcode = -25;
+	goto exit8;
       }
 
       unlink(opt.outfn->filename[0]);
@@ -401,28 +490,34 @@ int main(int argc, char **argv)
     wtm1 = walltime();
     elapse += wtm1 - wtm0;
     if (!rank)
-      printf("%%%% synctime = %.2g, nsamp = %d, elapse = %.2f\n", wtm1 - wtm0, rs.nsamp, elapse);
+      printf("%%%% synctime = %.2g, nsamp = %d, elapse = %.2f\n", wtm1 - wtm0, ndone, elapse);
     wtm0 = wtm1;
   }
   exitcode = 0;
 
+ exit8:
+  free(fntmp);
+ exit7:
+  if (!rank)
+    free(ss);
+ exit6:
+  free(si);
+ exit5:
+  charge_del(d.ch);
  exit4:
-  free(ri.p);
- exit3:
   d.chain->del(d.chain);
- exit2:
-  free(d.x);
- exit15:
-  charge_del(&ch);
- exit1:
+ exit3:
   free(seq);
- exit0:
+ exit2:
+  rnd_finish();
+ exit1:
 #ifdef MPI
   if (exitcode)
     MPI_Abort(MPI_COMM_WORLD, exitcode);
   MPI_Finalize();
 #endif
  exit:
+  fflush(stdout);
   argtable_del(argtable);
   exit(exitcode);
 }

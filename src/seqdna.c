@@ -28,16 +28,16 @@ static float lam[] = {
   0.623f	/* CC 33 1111 */
 };
 
-int readparm(FILE *f)
+int readparm(FILE *f, charge_parm_t *p)
 {
   int i, fcnt;
   for (i = 0; i < 4; ++i) {
-    fcnt = fscanf(f, "%f", bet + i);
+    fcnt = fscanf(f, "%f", p->bet + i);
     if (fcnt != 1)
       return -1;
   }  
   for (i = 0; i < 16; ++i) {
-    fcnt = fscanf(f, "%f", lam + i);
+    fcnt = fscanf(f, "%f", p->lam + i);
     if (fcnt != 1)
       return -1;
   }
@@ -71,7 +71,7 @@ int seqscan(FILE *f, char **seq)
   return i;
 }
 
-int seqdna(int n, const char *seq, real_t *d, real_t *s)
+int seqdna(charge_parm_t *p, int n, const char *seq, real_t *d, real_t *s)
 {
   int k, l, i;
 
@@ -83,7 +83,7 @@ int seqdna(int n, const char *seq, real_t *d, real_t *s)
   else if (seq[0] == 'T') k = 2;
   else if (seq[0] == 'C') k = 3;
   else return 2;
-  d[0] = (real_t) bet[k];
+  d[0] = (real_t) p->bet[k];
   l = k << 2;
   for (i = 1; i < n; ++i) {
     if (seq[i]  == 'G') k = 0;
@@ -91,8 +91,8 @@ int seqdna(int n, const char *seq, real_t *d, real_t *s)
     else if (seq[i] == 'T') k = 2;
     else if (seq[i] == 'C') k = 3;
     else return 2;
-    d[i] = (real_t) bet[k];
-    s[i - 1] = (real_t) lam[l | k];
+    d[i] = (real_t) p->bet[k];
+    s[i - 1] = (real_t) p->lam[l | k];
     l = k << 2;
   }
   return 0;

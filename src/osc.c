@@ -11,32 +11,29 @@
 # include <gsl/gsl_cblas.h>
 #endif
 
-#ifdef WIN32
-# include <process.h>
-#define getpid _getpid
-typedef int pid_t;
-
-struct timezone
-{
-  int tz_minuteswest; /* minutes W of Greenwich */
-  int tz_dsttime;     /* type of dst correction */
+charge_parm_t osc_charge_defs = {
+  0.02, 0.0, /* chi_e */
+  0.0, 6.84, 10.0, 10.0, /*  G  A  T  C */
+  1.276, 1.352, 2.081, 1.671, /* GG GA GT GC */
+  0.744, 0.456, 1.595, 0.927, /* AG AA AT AC */
+  1.291, 1.307, 2.400, 1.155, /* TG TA TT TC */
+  0.638, 0.441, 1.519, 0.623  /* CG CA CT CC */
 };
-struct timeval
+
+real_t en_kinetic(int n, const real_t *v)
 {
-  time_t tv_sec;
-  time_t tv_usec;
-};
-int gettimeofday(struct timeval *tv, struct timezone *tz);
+  real_t e;
+  e = 0.5 * cblas_dot(n, v, 1, v, 1);
+  return e;
+}
 
-#else
-#include <unistd.h>
-#endif
-
-#ifdef MPI
-#include <mpi.h>
-#endif
-
-#include "etrans.h"
+real_t en_potential(const chain_eq_t *chain, const real_t *u)
+{
+  real_t e;
+  const oscilator_t *o = (oscilator_t *) chain;
+  e = 0.5 * (o->K + o->D) * cblas_dot(o->n, u, 1, u, 1) - o->D * cblas_dot(o->n1, u, 1, u + 1, 1);
+  return e;
+}
 
 void f(const chain_eq_t *chain, const real_t *x, real_t *dx)
 {
@@ -48,10 +45,17 @@ void f(const chain_eq_t *chain, const real_t *x, real_t *dx)
   dv = dx + o->n;
   v = x + o->n;
   cblas_copy(o->n, v, 1, dx, 1);
+
+  dv[0] = -(o->K + o->D) * x[0] - o->L * v[0] + o->D * x[1];
+  for (i = 1; i < o->n1; ++i)
+    dv[i] = -(o->K + 2.0 * o->D) * x[i] - o->L * v[i] + o->D * (x[i + 1] + x[i - 1]);
+  dv[o->n1] = -(o->K + o->D) * x[o->n1] - o->L * v[o->n1] + o->D * x[o->n1 - 1];
+  /*
   dv[0] = -o->upr[0] * x[0] - o->tren[0] * v[0] + o->xi[0] * x[1];
   for (i = 1; i < o->n1; ++i)
     dv[i] = -o->upr[i] * x[i] - o->tren[i] * v[i] + o->xi[i] * (x[i + 1] + x[i - 1]);
   dv[o->n1] = -o->upr[o->n1] * x[o->n1] - o->tren[o->n1] * v[o->n1] + o->xi[o->n1] * x[o->n1 - 1];
+  */
 }
 
 void f2(const chain_eq_t *chain, const real_t *x, real_t *dx, real_t *b2)
@@ -64,10 +68,16 @@ void f2(const chain_eq_t *chain, const real_t *x, real_t *dx, real_t *b2)
   dv = dx + o->n;
   v = x + o->n;
   cblas_copy(o->n, v, 1, dx, 1);
+  dv[0] = -(o->K + o->D) * x[0] - o->L * v[0] + o->D * x[1] - o->mu * b2[0];
+  for (i = 1; i < o->n1; ++i)
+    dv[i] = -(o->K + 2.0 * o->D) * x[i] - o->L * v[i] + o->D * (x[i + 1] + x[i - 1]) - o->mu * b2[i];
+  dv[o->n1] = -(o->K + o->D) * x[o->n1] - o->L * v[o->n1] + o->D * x[o->n1 - 1] - o->mu * b2[o->n1];
+  /*
   dv[0] = -o->upr[0] * x[0] - o->tren[0] * v[0] + o->xi[0] * x[1] - o->lambda[0] * b2[0];
   for (i = 1; i < o->n1; ++i)
     dv[i] = -o->upr[i] * x[i] - o->tren[i] * v[i] + o->xi[i] * (x[i + 1] + x[i - 1]) - o->lambda[i] * b2[i];
   dv[o->n1] = -o->upr[o->n1] * x[o->n1] - o->tren[o->n1] * v[o->n1] + o->xi[o->n1] * x[o->n1 - 1] - o->lambda[o->n1] * b2[o->n1];
+  */
 }
 
 void runge(chain_eq_t *chain, real_t h, real_t *x)
@@ -76,7 +86,10 @@ void runge(chain_eq_t *chain, real_t h, real_t *x)
   int i, m;
   oscilator_t *o = (oscilator_t *) chain;
 
+  /*
   sqrth = _sqrt(h);
+  */
+  sqrth = _sqrt(h) * o->sigF;
   h_2 = 0.5 * h;
   m = 2 * o->n;
   y = o->runge_temp;
@@ -85,11 +98,14 @@ void runge(chain_eq_t *chain, real_t h, real_t *x)
 
   cblas_copy(m, x, 1, y, 1);
 
-  rnd_gaussian(o->rstr, o->n, x + o->n, 1.0);
+  rnd_gaussian(o->n, x + o->n, 1.0);
   /* memset(x + o->n, 0, o->n * sizeof(float)); */
 
   for (i = o->n; i < m; ++i)
+    x[i] = sqrth * x[i] + y[i];
+  /*
     x[i] = sqrth * o->sig[i - o->n] * x[i] + y[i];
+  */
   f(chain, x, k1);
   cblas_axpy(m, h, k1, 1, y, 1);
   f(chain, y, k2);
@@ -103,7 +119,10 @@ void runge2(chain_eq_t *chain, real_t h, real_t *x, real_t *b0, real_t *b1)
   int i, m;
   oscilator_t *o = (oscilator_t *) chain;
 
+  /*
   sqrth = _sqrt(h);
+  */
+  sqrth = _sqrt(h) * o->sigF;
   h_2 = 0.5 * h;
   m = 2 * o->n;
   y = o->runge_temp;
@@ -112,45 +131,24 @@ void runge2(chain_eq_t *chain, real_t h, real_t *x, real_t *b0, real_t *b1)
 
   cblas_copy(m, x, 1, y, 1);
 
-  rnd_gaussian(o->rstr, o->n, x + o->n, 1.0);
+  rnd_gaussian(o->n, x + o->n, 1.0);
   /*memset(x + o->n, 0, o->n * sizeof(float));*/
 
   for (i = o->n; i < m; ++i)
+    x[i] = sqrth * x[i] + y[i];
+  /*
     x[i] = sqrth * o->sig[i - o->n] * x[i] + y[i];
+  */
   f2(chain, x, k1, b0);
   cblas_axpy(m, h, k1, 1, y, 1);
   f2(chain, y, k2, b1);
   cblas_axpy(m, h_2, k1, 1, x, 1);
   cblas_axpy(m, h_2, k2, 1, x, 1);
 }
-
-void osc_equilibrate(chain_eq_t *chain, real_t h, real_t *x, int nstep, int rstep)
+void osc_equilibrate(chain_eq_t *chain)
 {
-  int i, n;
-  oscilator_t *o = (oscilator_t *) chain;
+}
 
-  if (rstep > 0) {
-    rnd_uniform(o->rstr, 1, &n, rstep);
-    n += nstep;
-  } else
-    n = nstep;
-  for (i = 0; i < n; ++i)
-    runge(chain, h, x);
-}
-/*
-void osc_integrate(oscilator_t *osc, real_t h, real_t *x, int nskip, int nout, real_t *u, real_t *v)
-{
-  int i, j, k;
-  k = 0;
-  for (j = 0; j < nout; ++j) {
-    for (i = 0; i < nskip; ++i)
-      runge(osc, h, x);
-    cblas_copy(osc->n, x, 1, u + k, 1);
-    cblas_copy(osc->n, x + osc->n, 1, v + k, 1);
-    k += osc->n;
-  }
-}
-*/
 void osc_x0_rand(chain_eq_t *chain, real_t *x)
 {
   int i, n2;
@@ -162,28 +160,24 @@ void osc_x0_rand(chain_eq_t *chain, real_t *x)
     memset(x, 0, n2 * sizeof(real_t));
     return;
   }
-  o->sv = _sqrt(0.5 * o->kt);
-  rnd_gaussian(o->rstr, o->n, x + o->n, o->sv);
-
-  /*  printf("K=%g D=%g\n", o->K, o->D);*/
+  o->sv = _sqrt(o->kt);
+  rnd_gaussian(o->n, x + o->n, o->sv);
 
   if (o->D == 0.0) {
-    o->su = _sqrt(0.5 * o->kt / o->K);
+    o->su = _sqrt(o->kt / o->K);
     b = 1.0;
     a = 0.0;
   } else {
     b = 2.0 * o->D;
     a = _sqrt(o->K * (o->K + 2.0 * b)); 
 
-    o->su = _sqrt(0.5 * o->kt / a);
+    o->su = _sqrt(o->kt / a);
     xi = (o->K + b - a) / b;
-
-    /*    printf("sigma=%g xi=%g\n", sigma, xi);*/
 
     a = _sqrt(xi);
     b = _sqrt(1.0 - xi);
   }
-  rnd_gaussian(o->rstr, o->n, x, o->su);
+  rnd_gaussian(o->n, x, o->su);
 
   if (o->D == 0.0)
     return;
@@ -192,101 +186,101 @@ void osc_x0_rand(chain_eq_t *chain, real_t *x)
     x[i] *= b;
     x[i] += x[i-1] * a; 
   }
-  /*
-  for (i = 0; i < o->n; ++i) {
-    if (o->K == 0.0)
-      x[i] = x[i + o->n] = 0.0;
-    else if (o->D == 0.0)
-      x[i] /= _sqrt(o->K);
-    else
-      x[i] *= (1.0 / a)
-  }
-  */
 }
 void osc_free(chain_eq_t *chain)
 {
-  oscilator_t *o = (oscilator_t *) chain;
-  rnd_free(o->rstr);
-  free(o->xi);
   free(chain);
 }
 
-
-oscilator_t *osc_init(int n, real_t temp, real_t tren, real_t upr, real_t xi, real_t lambda)
+int osc_init(chain_eq_t *chain, etrans_opt_t *o)
 {
   static real_t e0 = 0.261838952;
   static real_t t0 = 100.0;
-  int i, a;
-  unsigned int seed;
-  struct timeval tm;
-  pid_t pid;
-#ifdef MPI
-  int rank, np;
-#endif
-  oscilator_t *o;
+  oscilator_t *c = (oscilator_t *) chain;
+  if (o->omegaM2->count)
+    c->K = o->omegaM2->dval[0];
+  if (o->omegaB2->count)
+    c->D = o->omegaB2->dval[0];
+  if (o->gamma->count)
+    c->L = o->gamma->dval[0];
+  if (o->mu->count)
+    c->mu = o->mu->dval[0];
+  else
+    c->mu = o->chi->dval[0];
+  if (o->temp->count)
+    c->kt = 0.5 * e0 / t0 * o->temp->dval[0];
+  c->sigF = _sqrt(2.0 * c->L * c->kt);
 
-  o = (oscilator_t *) malloc(sizeof(oscilator_t));
-  if (!o)
-    return NULL;
+  if (o->h->count)
+    c->h = o->h->dval[0];
+  else
+    c->h = 0.01 / _sqrt(c->K > c->D ? c->K : c->D);
 
-  o->K = upr;
-  o->D = xi;
-  o->L = tren;
-  o->chi = lambda;
-
-  o->kt = e0 / t0 * temp;
-  o->n = n;
-  o->n1 = n - 1;
-  o->xi = (real_t *) malloc(11 * n * sizeof(real_t));
-  if (!o->xi) {
-    free(o);
-    return NULL;
-  }
-
-  o->period = 2.0 * M_PI / _sqrt(upr);
-
-  pid = getpid();
-  gettimeofday(&tm, NULL);
-  seed = (int) tm.tv_usec * (int) pid;
-#ifdef MPI
-  MPI_Comm_size(MPI_COMM_WORLD, &np);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  seed = seed * np + rank;
-#endif
-  o->rstr = rnd_alloc(seed);
-  if (!o->rstr) {
-    free(o->xi);
-    free(o);
-    return NULL;
-  }
-  o->lambda = o->xi + n;
-  o->upr = o->lambda + n;
-  o->tren = o->upr + n;
-  o->sig = o->tren + n;
-  o->runge_temp = o->sig + n;
-  for (i = 0; i < n; ++i) {
-    o->xi[i] = xi;
-    o->lambda[i] = lambda;
-    o->tren[i] = tren;
-    o->upr[i] = upr + 2.0 * xi;
-  }
-  o->upr[0] -= xi;
-  o->upr[o->n1] -= xi;
-  o->nsite = 0;
-  for (i = 0; i < n; ++i) {
-    a = o->upr[i] != 0.0;
-    o->sig[i] = (real_t) a * _sqrt(o->kt * tren);
-    o->nsite += a;
-  }
-
-  o->step_autonomic = &runge;
-  o->step_coupled = &runge2;
-  o->eq_autonomic = &f;
-  o->eq_coupled = &f2;
-  o->equilibrate = &osc_equilibrate;
-  o->x0 = &osc_x0_rand;
-  o->del = &osc_free;
-
-  return o;
+  return 0;
 }
 
+int osc_write(const chain_eq_t *chain, FILE *f)
+{
+  oscilator_t *c = (oscilator_t *) chain;
+  size_t fcnt;
+
+  fcnt = fwrite("OSC", sizeof(char), 3, f);
+  if (fcnt != 3)
+    return -1;
+  fcnt = fwrite(&c->kt, sizeof(real_t), 6, f);
+  if (fcnt != 6)
+    return -1;
+
+  return 0;
+}
+
+int osc_read(chain_eq_t *chain, FILE *f)
+{
+  oscilator_t *c = (oscilator_t *) chain;
+  size_t fcnt;
+
+  fcnt = fread(&c->kt, sizeof(real_t), 6, f);
+  if (fcnt != 6)
+    return -1;
+
+  return 0;
+}
+
+oscilator_t *mk_osc(int n)
+{
+  static real_t e0 = 0.261838952;
+  static real_t t0 = 100.0;
+  oscilator_t *c;
+
+  c = (oscilator_t *) malloc(sizeof(oscilator_t) + 6 * n * sizeof(real_t));
+  if (!c)
+    return NULL;
+
+  c->runge_temp = (real_t *) (c + 1);
+
+  c->n = n;
+  c->n1 = n - 1;
+
+  c->step_autonomic = &runge;
+  c->step_coupled = &runge2;
+  c->eq_autonomic = &f;
+  c->eq_coupled = &f2;
+  c->equilibrate = &osc_equilibrate;
+  c->x0 = &osc_x0_rand;
+  c->del = &osc_free;
+  c->en_potential = &en_potential;
+  c->init = &osc_init;
+  c->write = &osc_write;
+  c->read = &osc_read;
+
+  c->K = 1e-4;
+  c->D = 0.0;
+  c->L = 6e-3;
+  c->mu = 0.02;
+  c->kt = 0.5 * e0 / t0 * 300.0;
+  c->sigF = _sqrt(2.0 * c->L * c->kt);
+
+  c->h = 0.01 / _sqrt(c->K > c->D ? c->K : c->D);
+
+  return c;
+}

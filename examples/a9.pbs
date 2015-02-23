@@ -1,5 +1,5 @@
 #PBS -N a9
-#PBS -l nodes=1:ppn=8,walltime=2400:00:00
+#PBS -l nodes=1:ppn=1,walltime=2400:00:00
 #PBS -V
 #PBS -o tmp.out
 #PBS -e tmp.err
@@ -11,7 +11,8 @@ DO=../bin/etrans.MPI
 FN_IN=a9.txt
 FN_OUT=$PBS_JOBNAME
 
-OPTS=' -N 125 -T 300 -Q 0 -f 0
- -h 0.2'
+OPTS=' -N 125 -T 300 -Q 2
+ -h 0.2 -O outsh.txt '
+
 
 mpiexec.openmpi ${DO} -s ${FN_IN} ${OPTS} -l ${FN_OUT}.log ${FN_OUT}.dat

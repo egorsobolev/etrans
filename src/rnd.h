@@ -12,9 +12,13 @@ typedef VSLStreamStatePtr rnd_stream_p;
 typedef gsl_rng *rnd_stream_p;
 #endif
 
-void rnd_uniform(rnd_stream_p rnd, int n, int *x, int mx);
-void rnd_gaussian(rnd_stream_p rnd, int n, real_t *x, real_t sigma);
+void rnd_uniform_int(int n, int *x, int mx);
+void rnd_uniform(int n, real_t *x, real_t mx);
+void rnd_gaussian(int n, real_t *x, real_t sigma);
 rnd_stream_p rnd_alloc(unsigned int seed);
 void rnd_free(rnd_stream_p rnd);
+
+int rnd_init();
+void rnd_finish();
 
 #endif /* __ETRANS_RND_H */

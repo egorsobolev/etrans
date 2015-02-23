@@ -1,3 +1,34 @@
+2015-02-23 Egor Sobolev <egor@impb.psn.ru>
+ * released abstract interface to result functionals
+ * unified all implemented functionals
+ * added input file of output sheme (-O) allows to set output functional and corresponding output steps
+ * added common output step (-Q) allows calculate long time with rare output
+ * added options (-0) to set origin site
+ * removed old commented source code
+ * changed format of output file to describe variable set of output functionals
+ * fixed etrans_read.m to read new format
+ * added help into etrans_read.m
+
+2015-01-19 Egor Sobolev <egor@impb.psn.ru>
+ * added electric field term (-U)
+ * added current functional j(t)
+ * added equations parameters in output file
+ * restart with parameters from restart file
+ 
+2015-01-06 Egor Sobolev <egor@impb.psn.ru>
+ * added Peyrard-Bishop-Dauxois model of classical chain
+ * default values of options depend on choise of model
+ * added functions for serializing equations
+ * unified interface to get initial states of classical chain by direct generation or by heating procedure
+ * removed by site parameters in classical equation
+
+2014-10-26 Egor Sobolev <egor@impb.psn.ru>
+ * added functionals b4^-1(t), enq(t), enu(t), env(t)
+ * added output step of functinals (-w)
+ * added random initialization of u and v which takes into account the dispersion
+ * removed heating procedure and options
+ * random phase of standard inital charge distribution (1 on central site)
+
 2014-10-25 Egor Sobolev <egor@impb.psn.ru>
  * release of an abstract interface to the classical subsystem
  * added wrapping interface for random streams

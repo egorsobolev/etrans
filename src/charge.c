@@ -33,23 +33,78 @@ void clapack_dstevx(char jobz, char range, int n, double *d, double *e,
 #define REAL_MAX DBL_MAX
 #endif
 
-
-int charge_init(charge_eq_t *eq, int n, real_t chi)
+charge_eq_t *mk_charge(int n, int n0, charge_parm_t *def)
 {
-  eq->d = (real_t *) malloc(11 * n * sizeof(real_t) + 5 * n * sizeof(int));
-  if (!eq->d)
-    return -1;
+  charge_eq_t *eq;
+  eq = (charge_eq_t *) malloc(sizeof(charge_eq_t) + 11 * n * sizeof(real_t) + 5 * n * sizeof(int));
+  if (!eq)
+    return NULL;
+  eq->d = (real_t *) (eq + 1);
   eq->s = eq->d + n;
   eq->s0 = eq->s + n;
   eq->work = eq->s0 + n;
   eq->n = n;
-  eq->chi = chi;
+  eq->n0 = n0;
+  eq->chi = def->chi;
+  eq->lambda = def->lambda;
+
+  return eq;
+}
+
+int charge_init(charge_eq_t *eq, etrans_opt_t *o)
+{
+  int i;
+
+  if (o->chi->count)
+    eq->chi = o->chi->dval[0];
+  if (o->lambda->count)
+    eq->lambda = o->lambda->dval[0];
+
+  for (i = 0; i < eq->n; i++) {
+    eq->d[i] += eq->lambda * (i - eq->n0);
+  }
   return 0;
 }
 
 void charge_del(charge_eq_t *eq)
 {
-  free(eq->d);
+  free(eq);
+}
+
+int charge_write(const charge_eq_t *eq, FILE *f)
+{
+  int n;
+
+  n = 2 * eq->n - 1;
+
+  if (fwrite(&eq->n0, sizeof(int), 1, f) != 1)
+    return -1;
+  if (fwrite(&eq->chi, sizeof(real_t), 1, f) != 1)
+    return -1;
+  if (fwrite(&eq->lambda, sizeof(real_t), 1, f) != 1)
+    return -1;
+  if (fwrite(eq->d, sizeof(real_t), n, f) != n)
+    return -1;
+
+  return 0;
+}
+
+int charge_read(charge_eq_t *eq, FILE *f)
+{
+  int n;
+  n = 2 * eq->n - 1;
+
+  if (fread(&eq->n0, sizeof(int), 1, f) != 1)
+    return -1;
+  if (fread(&eq->chi, sizeof(real_t), 1, f) != 1)
+    return -1;
+  if (fread(&eq->lambda, sizeof(real_t), 1, f) != 1)
+    return -1;
+  
+  if (fread(eq->d, sizeof(real_t), n, f) != n)
+    return -1;
+
+  return 0;
 }
 
 real_t charge_expM(charge_eq_t *eq, int m, real_t h0, real_t sn, real_t cs, const real_t *u, const real_t *v, real_t *sr, real_t *si)
@@ -125,7 +180,7 @@ real_t charge_expM(charge_eq_t *eq, int m, real_t h0, real_t sn, real_t cs, cons
   return b2;
 }
 
-void charge_step_adj(charge_eq_t *eq, real_t h, const real_t *u, const real_t *v, const real_t *sr, const real_t *si,
+void charge_step_adj(charge_eq_t *eq, real_t h, int revstep, const real_t *u, const real_t *v, const real_t *sr, const real_t *si,
 		     int *nskip, real_t *h0, real_t *sn, real_t *cs, real_t *s0)
 {
   static real_t abstol;
@@ -148,7 +203,7 @@ void charge_step_adj(charge_eq_t *eq, real_t h, const real_t *u, const real_t *v
   cblas_copy(eq->n, eq->d, 1, d0, 1);
   cblas_axpy(eq->n, eq->chi, u, 1, d0, 1);
   cblas_copy(eq->n, d0, 1, ds, 1);
-  cblas_axpy(eq->n, eq->h_revstep * h * eq->chi, v, 1, ds, 1);
+  cblas_axpy(eq->n, revstep * h * eq->chi, v, 1, ds, 1);
 
   clapack_stevx('N', 'I', eq->n, d0, eq->s, 0.0, 1.0, 1, 1, abstol, &neigs, wa, NULL, eq->n, work, iwork, NULL, &info);
   a = wa[0];

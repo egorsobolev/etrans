@@ -1,5 +1,5 @@
-#ifndef __ETRANS_MORSE_H
-#define __ETRANS_MORSE_H
+#ifndef __ETRANS_PBD_H
+#define __ETRANS_PBD_H
 
 #include "config.h"
 #include "types.h"
@@ -7,9 +7,9 @@
 #include "rnd.h"
 #include "charge.h"
 
-charge_parm_t osc_charge_defs;
+charge_parm_t pbd_charge_defs;
 
-struct OSCILATOR
+struct PBDChain
 {
   /* inherited fields */
   autonomic_chain_step_f *step_autonomic;
@@ -27,15 +27,17 @@ struct OSCILATOR
   real_t h;
 
   /* own fields */
-  real_t kt;
-  real_t D, K, L, mu, sigF;
-  real_t su, sv;
   int n, n1;
+  real_t omegaM2, sigma;
+  real_t omegaB2, epsilon, rho;
+  real_t theta0, theta, sigmaF;
+  real_t Gamma, chi;
+  real_t *f0;
 
   real_t *runge_temp;
 };
-typedef struct OSCILATOR oscilator_t;
+typedef struct PBDChain pbd_chain_t;
 
-oscilator_t *mk_osc(int n);
+pbd_chain_t *mk_pbd(int n);
 
-#endif /* __ETRANS_OSC_H */
+#endif /* __ETRANS_PBD_H */
