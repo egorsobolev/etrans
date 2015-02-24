@@ -379,6 +379,11 @@ int pbd_read(chain_eq_t *chain, FILE *f)
   return 0;
 }
 
+size_t pbd_nbytes(int n)
+{
+  return sizeof(pbd_chain_t) + 8 * n * sizeof(real_t);
+}
+
 pbd_chain_t *mk_pbd(int n)
 {
   pbd_chain_t *c;
@@ -386,7 +391,7 @@ pbd_chain_t *mk_pbd(int n)
 
   /* 6n - runge workspace */
   /* 2n - stored termolized x0 */
-  c = (pbd_chain_t *) malloc(sizeof(pbd_chain_t) + 8 * n * sizeof(real_t));
+  c = (pbd_chain_t *) malloc(pbd_nbytes(n));
   if (!c)
     return NULL;
 
@@ -427,6 +432,7 @@ pbd_chain_t *mk_pbd(int n)
   c->init = &pbd_init;
   c->write = &pbd_write;
   c->read = &pbd_read;
+  c->nbytes = &pbd_nbytes;
 
   return c;
 }

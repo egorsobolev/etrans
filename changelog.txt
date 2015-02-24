@@ -1,3 +1,12 @@
+2015-02-24 Egor Sobolev <egor@impb.psn.ru>
+ * fixed bug of reading quantum parameters from file
+ * added memory usage info into log exclude seq & pbd_equlibrate
+ * added storing phase variables into file at end point of trajectory for each sample to continue trajectory if it will be need
+ * added abstract inteface for initial states
+ * unified all implemented initial states
+ * added initial state as set of trajectory points so it allows to continue trajectory from stored set of endpoints
+ * added opiton -y to choose type of initial state: 1-one on n0 (-0) site, P-one state, S-set of states
+
 2015-02-23 Egor Sobolev <egor@impb.psn.ru>
  * released abstract interface to result functionals
  * unified all implemented functionals

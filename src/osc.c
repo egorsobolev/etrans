@@ -246,13 +246,18 @@ int osc_read(chain_eq_t *chain, FILE *f)
   return 0;
 }
 
+size_t osc_nbytes(int n)
+{
+  return sizeof(oscilator_t) + 6 * n * sizeof(real_t);
+}
+
 oscilator_t *mk_osc(int n)
 {
   static real_t e0 = 0.261838952;
   static real_t t0 = 100.0;
   oscilator_t *c;
 
-  c = (oscilator_t *) malloc(sizeof(oscilator_t) + 6 * n * sizeof(real_t));
+  c = (oscilator_t *) malloc(osc_nbytes(n));
   if (!c)
     return NULL;
 
@@ -272,6 +277,7 @@ oscilator_t *mk_osc(int n)
   c->init = &osc_init;
   c->write = &osc_write;
   c->read = &osc_read;
+  c->nbytes = &osc_nbytes;
 
   c->K = 1e-4;
   c->D = 0.0;

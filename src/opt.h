@@ -6,11 +6,11 @@
 
 struct ETRANS_OPTIONS
 {
-  struct arg_file *seqfn, *logfn, *initfn, *prmfn, *outfn, *outsh;
+  struct arg_file *seqfn, *logfn, *initfn, *prmfn, *outfn, *outsh, *lpfn;
   struct arg_lit *rst, *help, *ver;
   struct arg_int *nsamp, *na, *n0, *no;
   struct arg_dbl *tmax, *h, *temp, *gamma, *omegaM2, *chi, *mu, *omegaB2, *drp, *sigma, *rho, *epsilon, *lambda;
-  struct arg_str *mdl;
+  struct arg_str *mdl, *init;
   struct arg_end *end;
 };
 typedef struct ETRANS_OPTIONS etrans_opt_t;

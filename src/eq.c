@@ -30,15 +30,20 @@
 #define REAL_MAX DBL_MAX
 #endif
 
+size_t eq_nbytes(int n)
+{
+  return 10 * n * sizeof(real_t);
+}
 
-int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
+
+int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res, SFILE *lp)
 {
   int nstep, nskip, n, i, j, ln, k, m, q, qn;
   real_t p2, a, sn, cs, h0, normp, mn, mx, nr;
   real_t *u, *v, *b2l, *b2r, *b2t;
   real_t *sr, *si, *dsr, *dsi, *d2sr, *d2si;
   real_t env, enu;
-  int rank;
+  int rank, err;
   double elapse, wtm0, wtm1;
 
 #ifdef MPI
@@ -52,7 +57,7 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
   n = d->n;
   nstep = d->nstep;
 
-  sr = (real_t *) malloc(10 * n * sizeof(real_t));
+  sr = (real_t *) malloc(eq_nbytes(n));
   if (!sr) return -1;
 
   si = sr + n;
@@ -73,26 +78,22 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
 
     d->chain->x0(d->chain, u);
 
-    if (d->x0) {
-      cblas_axpy(2 * n, 1.0, d->x0 + 2 * n, 1, u, 1); 
-      cblas_copy(2 * n, d->x0, 1, sr, 1);
-    } else {
-      memset(sr, 0, 2 * n * sizeof(real_t));
-      rnd_uniform(1, &a, 2.0 * M_PI);
-      sr[d->ch->n0] = cos(a);
-      si[d->ch->n0] = sin(a);
-    }
-    p2 = 1.0;
+    if (d->s->set(d->s, n, d->ch->n0, sr))
+      break;
 
+    p2 = 0.0;
     for (k = 0; k < n; ++k) {
-      b2l[k] = sr[k] * sr[k] + si[k] * si[k];
+      a = sr[k] * sr[k] + si[k] * si[k];
+      b2l[k] = a;
+      p2 += a;
     }
+    nr = _fabs(p2 - 1.0);
+
     diff_b(d->ch, sr, dsr, d2sr);
     sol_reset(res);
     sol_update(d, sr, b2l, dsr, d2sr, res);
 
     j = d->nskip - 1;
-    nr = 0.0;
     mn = REAL_MAX;
     mx = 0.0;
     ln = 0;
@@ -136,6 +137,17 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
       --j;
       --ln;
     }
+    if (lp) {
+#ifdef MPI
+      err = MPI_File_write_shared(*lp, sr, 4*n, MPI_ET_REAL, MPI_STATUS_IGNORE);
+#else
+      err = fwrite(sr, sizeof(real_t), 4 * n, lp) != (4*n);
+#endif
+      if (err) {
+	free(sr);
+	return -2;
+      }
+    }
     wtm1 = walltime();
     if (!rank) {
       env = 0.5 * cblas_dot(n, v, 1, v, 1);
@@ -146,7 +158,7 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
     elapse += (wtm1 - wtm0);
     wtm0 = wtm1;
   }
-  res->nsamp = qn;
+  res->nsamp = q;
   free(sr);
 
   return 0;

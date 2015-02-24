@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NOPTION 28
+#define NOPTION 30
 
 void **argtable_mk(etrans_opt_t *o)
 {
@@ -18,7 +18,9 @@ void **argtable_mk(etrans_opt_t *o)
   t[i++] = o->n0 = arg_int0("0", NULL, NULL, "number of site that is used as the origin ((n-1)/2+1)");
   t[i++] = o->outsh = arg_file0("O", NULL, NULL, "output sheme file");
   t[i++] = o->logfn = arg_file0("l", NULL, NULL, "log file");
+  t[i++] = o->init = arg_str0("y", NULL, NULL, "initial state type: 1, P, S (1)");
   t[i++] = o->initfn = arg_file0("I", NULL, NULL, "initial state file");
+  t[i++] = o->lpfn = arg_file0("w", NULL, NULL, "file of last point for each sample"); 
   t[i++] = o->rst = arg_lit0("c", NULL, "continue from control point");
   t[i++] = o->nsamp = arg_int1("N", NULL, NULL, "number of samples per processor");
   t[i++] = o->tmax = arg_dbl0("t", NULL, NULL, "trajectory time (600)");
@@ -68,6 +70,7 @@ void **argtable_mk(etrans_opt_t *o)
   o->lambda->dval[0] = 0.0;
   o->drp->dval[0] = 20.0;
   o->mdl->sval[0] = "OSC";
+  o->init->sval[0] = "1";
 
   return t;
 }

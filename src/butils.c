@@ -39,7 +39,7 @@ void diff_b(charge_eq_t *ch, real_t *b, real_t *db, real_t *d2b)
   d2x[n1] = ch->s[n1-1] * dy[n1-1] + (ch->d[n1] + ch->chi * u[n1]) * dy[n1] + ch->chi * v[n1] * y[n1];
   d2y[n1] = -(ch->s[n1-1] * dx[n1-1] + (ch->d[n1] + ch->chi * u[n1]) * dx[n1] + ch->chi * v[n1] * x[n1]);
 }
-
+/*
 int b0_read(FILE *f, int n, real_t *x)
 {
   int m, c, lm, rm, i, j;
@@ -83,3 +83,4 @@ int b0_read(FILE *f, int n, real_t *x)
   }
   return 0;
 }
+*/

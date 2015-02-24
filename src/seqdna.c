@@ -1,45 +1,24 @@
 #include <stdio.h>
 #include <malloc.h>
 
-#include "etrans.h"
-
-static float bet[] = {
-  0.00f,	/* G 0 00 */
-  6.84f,	/* A 1 01 */
-  10.00f,	/* T 2 10 */
-  10.00f	/* C 3 11 */
-};
-static float lam[] = {
-  1.276f,	/* GG 00 0000 */
-  1.352f,	/* GA 01 0001 */
-  2.081f,	/* GT 02 0010 */
-  1.671f,	/* GC 03 0011 */
-  0.744f,	/* AG 10 0100 */
-  0.456f,  /* AA 11 0101 */
-  1.595f,	/* AT 12 0110 */
-  0.927f,	/* AC 13 0111 */
-  1.291f,	/* TG 20 1000 */
-  1.307f,	/* TA 21 1001 */
-  2.400f,	/* TT 22 1010 */
-  1.155f,	/* TC 23 1011 */
-  0.638f,	/* CG 30 1100 */
-  0.441f,	/* CA 31 1101 */
-  1.519f,	/* CT 32 1110 */
-  0.623f	/* CC 33 1111 */
-};
+#include "types.h"
+#include "charge.h"
 
 int readparm(FILE *f, charge_parm_t *p)
 {
   int i, fcnt;
+  double b;
   for (i = 0; i < 4; ++i) {
-    fcnt = fscanf(f, "%f", p->bet + i);
+    fcnt = fscanf(f, "%lf", &b);
     if (fcnt != 1)
       return -1;
+    p->bet[i] = (real_t) b;
   }  
   for (i = 0; i < 16; ++i) {
-    fcnt = fscanf(f, "%f", p->lam + i);
+    fcnt = fscanf(f, "%lf", &b);
     if (fcnt != 1)
       return -1;
+    p->lam[i] = (real_t) b;
   }
   return 0;
 }

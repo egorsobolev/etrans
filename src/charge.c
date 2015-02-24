@@ -33,10 +33,15 @@ void clapack_dstevx(char jobz, char range, int n, double *d, double *e,
 #define REAL_MAX DBL_MAX
 #endif
 
+size_t charge_nbytes(int n)
+{
+  return sizeof(charge_eq_t) + 11 * n * sizeof(real_t) + 5 * n * sizeof(int);
+}
+
 charge_eq_t *mk_charge(int n, int n0, charge_parm_t *def)
 {
   charge_eq_t *eq;
-  eq = (charge_eq_t *) malloc(sizeof(charge_eq_t) + 11 * n * sizeof(real_t) + 5 * n * sizeof(int));
+  eq = (charge_eq_t *) malloc(charge_nbytes(n));
   if (!eq)
     return NULL;
   eq->d = (real_t *) (eq + 1);

@@ -24,6 +24,8 @@ typedef real_t en_potential_f(const chain_eq_t *o, const real_t *u);
 typedef int chain_write_f(const chain_eq_t *c, FILE *f);
 typedef int chain_read_f(chain_eq_t *c, FILE *f);
 
+typedef size_t chain_nbytes_f(int n);
+
 struct CHAIN_EQUATION
 {
   autonomic_chain_step_f *step_autonomic;
@@ -37,6 +39,7 @@ struct CHAIN_EQUATION
   chain_init_f *init;
   chain_write_f *write;
   chain_read_f *read;
+  chain_nbytes_f *nbytes;
 
   real_t h;
 };

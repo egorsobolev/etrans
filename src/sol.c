@@ -129,18 +129,40 @@ int sol_default_meta(sol_meta_t *m)
   return i;
 }
 
-void sol_print_meta(FILE *f, int n, const sol_meta_t *m)
+void sol_print_meta(FILE *f, int nfunc, const sol_meta_t *m, int n, long nstep)
 {
-  int i;
+  int i, v, t;
   size_t nb;
-  fprintf(f, "  # func     M  mean step S   std step\n");
-  for (i = 0; i < n; i++) {
-    fprintf(f, "%3d %-8s %c %10d %c %10d\n", i+1, int_func[m[i].id].name,
-	    (m[i].flag & ET_MEAN) == ET_MEAN ? '+':'-', m[i].mean_step,
-	    (m[i].flag & ET_STD) == ET_STD ? '+':'-', m[i].std_step);
+
+  fprintf(f, "Output      --- Mean -----------------------  --- Std ------------------------\n");
+  fprintf(f, "Functional                 Size        Bytes                 Size        Bytes\n");
+
+  for (i = 0; i < nfunc; i++) {
+    fprintf(f, "%10s:", int_func[m[i].id].name);
+    v = int_func[m[i].id].vlen(n);
+    if (m[i].flag & ET_MEAN) {
+      t = m[i].mean_step ? nstep / m[i].mean_step + 1 : 2;
+      nb = int_func[m[i].id].numel(n, t) * sizeof(double);
+      fprintf(f, "%10dx%-9d%13ld", v, t, nb);
+    } else {
+      fprintf(f, "%11c%22d",'-', 0);
+    }
+    if (m[i].flag & ET_STD) {
+      t = m[i].std_step ? nstep / m[i].std_step + 1 : 2;
+      nb = int_func[m[i].id].numel(n, t) * sizeof(double);
+      fprintf(f, "%11dx%-9d%13ld", v, t, nb);
+    } else {
+      fprintf(f, "%12c%22d",'-', 0);
+    }
+    fprintf(f, "\n");
   }
+  fprintf(f, "\n");
 }
 
+size_t sol_nbytes(int n, long numel, int nfunc)
+{
+  return sizeof(sol_t) + nfunc * (sizeof(int) + 4*sizeof(long) + 2*sizeof(double *)) + (n + numel) * sizeof(double);
+}
 
 sol_t *mk_sol(int nfunc, sol_meta_t *m, int n, long nstep)
 {
@@ -155,7 +177,7 @@ sol_t *mk_sol(int nfunc, sol_meta_t *m, int n, long nstep)
     if (m[i].flag & ET_STD)
       numel += int_func[m[i].id].numel(n, m[i].std_step ? nstep / m[i].std_step + 1 : 2);
   }
-  s = (sol_t *) malloc(sizeof(sol_t) + nfunc * (sizeof(int) + 4*sizeof(long) + 2*sizeof(double *)) + (n + numel) * sizeof(double));
+  s = (sol_t *) malloc(sol_nbytes(n, numel, nfunc));
   if (!s)
     return NULL;
   s->imean = (long *) (s + 1);

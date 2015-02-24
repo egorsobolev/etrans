@@ -23,6 +23,7 @@ struct OSCILATOR
   chain_init_f *init;
   chain_write_f *write;
   chain_read_f *read;
+  chain_nbytes_f *nbytes;
 
   real_t h;
 

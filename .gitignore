@@ -2,6 +2,7 @@
 *.a
 *.o
 *.so
+TODO.txt
 bin/*
 test/
 src/.o.mpi/

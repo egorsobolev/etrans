@@ -25,6 +25,7 @@ struct CHARGE_EQUATION
 };
 typedef struct CHARGE_EQUATION charge_eq_t;
 
+size_t charge_nbytes(int n);
 charge_eq_t *mk_charge(int n, int n0, charge_parm_t *def);
 int charge_init(charge_eq_t *eq, etrans_opt_t *o);
 void charge_del(charge_eq_t *eq);

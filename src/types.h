@@ -5,6 +5,7 @@
 
 #ifdef USE_SINGLE
 typedef float real_t;
+# define MPI_ET_REAL MPI_FLOAT
 
 # define _sqrt(X) sqrtf(X)
 # define _sin(X) sinf(X)
@@ -20,6 +21,7 @@ typedef float real_t;
 # define thomas1 thomas1s
 #else
 typedef double real_t;
+# define MPI_ET_REAL MPI_DOUBLE
 
 # define _sqrt(X) sqrt(X)
 # define _sin(X) sin(X)
@@ -33,6 +35,12 @@ typedef double real_t;
 # define clapack_lamch clapack_dlamch
 # define clapack_stevx clapack_dstevx
 # define thomas1 thomas1d
+#endif
+
+#ifdef MPI
+#define SFILE MPI_File
+#else
+#define SFILE FILE
 #endif
 
 #endif /* __ETRANS_TYPES_H */

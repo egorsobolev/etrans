@@ -3,6 +3,8 @@
 #include "osc.h"
 #include "pbd.h"
 
+#include "initial.h"
+
 #include "sol.h"
 
 #include <stdlib.h>
@@ -50,7 +52,7 @@ void vdSqrt(int n, const double *a, double *y)
 #include "opt.h"
 
 
-int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res);
+int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res, SFILE *lp);
 
 int eq_read_head(eqdata_t *d, FILE *f)
 {
@@ -108,9 +110,18 @@ int main(int argc, char **argv)
   double *ss;
   FILE *f;
   int rank, np;
-  int rst;
+  int rst, err;
   charge_parm_t charge_parm;
   char mdl[4];
+  size_t nb, tmem;
+#ifdef MPI
+  MPI_File mpi_lp, mpi_is;
+  MPI_File *lp, *is;
+  lp = NULL;
+  is = NULL;
+#else
+  FILE *lp, *is;
+#endif
 
   argtable = argtable_mk(&opt);
   if (!argtable) {
@@ -169,7 +180,6 @@ int main(int argc, char **argv)
   }
 
   rst = opt.rst->count;
-
   if (rst) {
     seq = NULL;
 
@@ -276,7 +286,7 @@ int main(int argc, char **argv)
     }
     /* read quantum parameters from file */
     if (opt.prmfn->count > 0) {
-      f = fopen(opt.prmfn->filename[0], "r");
+      f = fopen(opt.prmfn->filename[0], "rt");
       if (!f) {
 	fprintf(stderr, "%s: can't open file of quantum parameters.\n", progname);
 	exitcode = -9;
@@ -348,15 +358,15 @@ int main(int argc, char **argv)
   d.h_revstep = opt.na->ival[0];
 
   si = mk_sol(nfunc, sol_meta, d.n, d.nstep);
-  sol_print_meta(stdout, nfunc, sol_meta);
-  printf("nsamp: %d\n", ndone);
   if (!si) {
+    exitcode = -160;
     fprintf(stderr, "%s: insufficient memory to allocate output fuctional\n", progname);
     goto exit5;
   }
   if (!rank) {
     ss = calloc(si->numel, sizeof(double));
     if (!ss) {
+      exitcode = -160;
       fprintf(stderr, "%s: insufficient memory to allocate the summation buffer\n", progname);
       goto exit6;
     }
@@ -377,49 +387,111 @@ int main(int argc, char **argv)
       memset(ss, 0, si->numel * sizeof(double));
   }
 
-  fnlen = strlen(opt.outfn->filename[0]);
-
-  if (opt.initfn->count) {
-    fntmp = (char *) malloc(4 * d.n * sizeof(real_t) + fnlen + 1);
-  } else {
-    fntmp = (char *) malloc(fnlen + 1);
-  }
-  if (!fntmp) {
-    printf("%s: insufficient memory\n", progname);
-    exitcode = -20;
-    goto exit7;
-  }
-  d.x0 = (real_t *) (fntmp + fnlen + 1);
-
-  strcpy(fntmp, opt.outfn->filename[0]);
-  fntmp[fnlen - strlen(opt.outfn->basename[0])] = '$';
-
-  if (opt.initfn->count) {
+  if (!strcmp(opt.init->sval[0], "1")) {
+    d.s = (initial_t *) mk_initial_1site(d.ch->n0);
+  } else if (!strcmp(opt.init->sval[0], "P")) {
+    if (!opt.initfn->count) {
+      fprintf(stderr, "%s: if -y P, you must specify initial state file (-I).\n", progname);
+      exitcode = 150;
+      goto exit7;
+    }
     f = fopen(opt.initfn->filename[0], "r");
     if (!f) {
       fprintf(stderr, "%s: can't open initial state file.\n", progname);
       exitcode = -21;
-      goto exit8;
+      goto exit7;
     }
-    exitcode = b0_read(f, d.n, d.x0);
+    d.s = (initial_t *) mk_initial_1state(f, d.n, d.ch->n0);
     fclose(f);
-    if (exitcode) {
-      fprintf(stderr, "%s: can't read initial state\n", progname);
-      exitcode = -22;
-      goto exit8;
+  } else if (!strcmp(opt.init->sval[0], "S")) {
+    if (!opt.initfn->count) {
+      fprintf(stderr, "%s: if -y S, you must specify initial state file (-I).\n", progname);
+      exitcode = 150;
+      goto exit7;
     }
+#ifdef MPI
+    is = &mpi_is;
+    err = MPI_File_open(MPI_COMM_WORLD, opt.initfn->filename[0], MPI_MODE_RDONLY, MPI_INFO_NULL, is);
+#else
+    is = fopen(opt.initfn->filename[0], "r");
+    err = !is;
+#endif
+    if (err) {
+      fprintf(stderr, "%s: can't open initial state file.\n", progname);
+      exitcode = -21;
+      goto exit7;
+    }
+    d.s = (initial_t *) mk_initial_set(is, ndone, d.n, d.ch->n0);
   } else {
-    d.x0 = NULL;
+    fprintf(stderr, "%s: invalid value of -y.\n", progname);
+    exitcode = -151;
+    goto exit7;
   }
+  if (!d.s) {
+    exitcode = -155;
+    fprintf(stderr, "%s: insufficient memory to allocate initial state structures.\n", progname);
+    goto exit8;
+  }
+
+  fnlen = strlen(opt.outfn->filename[0]);
+  nb = fnlen + 1;
+  fntmp = (char *) malloc(nb);
+  if (!fntmp) {
+    printf("%s: insufficient memory\n", progname);
+    exitcode = -20;
+    goto exit9;
+  }
+
+  strcpy(fntmp, opt.outfn->filename[0]);
+  fntmp[fnlen - strlen(opt.outfn->basename[0])] = '$';
 
   d.chain->equilibrate(d.chain);
 
-  printf("       n:%-10d         n0:%-10d \n", d.n, d.ch->n0);
   /*
   goto exit7;
   */
 
+  if (opt.lpfn->count) {
+#ifdef MPI
+    lp = &mpi_lp;
+    err = MPI_File_open(MPI_COMM_WORLD, opt.lpfn->filename[0], MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, lp);
+#else
+    lp = fopen(opt.lpfn->filename[0], "wb");
+    err = !lp;
+#endif
+    if (err) {
+      fprintf(stderr, "%s: can't open file of last points.\n", progname);
+      exitcode = 120;
+      goto exit10;
+    }
+    if (!rank) {
+#ifdef MPI
+      err = MPI_File_write_shared(*lp, &d.ch->n, 2, MPI_INT, MPI_STATUS_IGNORE);
+#else
+      err = fwrite(&d.ch->n, sizeof(int), 2, lp) != 2;
+#endif
+    }
+    if (err) {
+      fprintf(stderr, "%s: can't write in the file of last points.\n", progname);
+      exitcode = 121;
+      goto exit11;
+    }
+  }
+
   if (!rank) {
+    sol_print_meta(stdout, nfunc, sol_meta, d.n, d.nstep);
+
+    nb += eq_nbytes(d.n) + sol_nbytes(d.n, si->numel, si->nfunc) + 
+      charge_nbytes(d.n) + d.chain->nbytes(d.n) + d.s->nbytes(d.s);
+
+    printf("Used memory on slave:  %12ld\n", nb);
+    printf("Used memory on master: %12ld\n\n", nb + si->numel * sizeof(double));
+
+    printf("Nsamp: %d/%d\n\n", ndone, ndone + np * nsamp);
+
+    /*               1         2         3         4         5         6         7         8
+    /*      12345678901234567890123456789012345678901234567890123456789012345678901234567890 */
+    /* printf("     # ===== progress =====      t,s max|P2-1|    min(h)     P(1)     P(n)\n"); */
     printf("     #      t,s max|P2-1|    min(h)    max(h)        Ek        Ep\n");
     fflush(stdout);
   }
@@ -435,10 +507,10 @@ int main(int argc, char **argv)
     /* reset partial statistics */
     sol_setzero(si);
     /* solve quantum equation qn times */
-    if (eq(&d, d.h, tmax, qn, si)) {
+    if (eq(&d, d.h, tmax, qn, si, lp)) {
       fprintf(stderr, "%s: insufficient memory\n", progname);
       exitcode = -23;
-      goto exit8;
+      goto exit11;
     }
     i -= qn;
     wtm1 = walltime();
@@ -469,7 +541,7 @@ int main(int argc, char **argv)
       if (!f) {
 	fprintf(stderr, "%s: can't reset output file.\n", progname);
 	exitcode = -24;
-	goto exit8;
+	goto exit11;
       }
       exitcode = etrans_write(&d, si, ndone, ss, f);
       if (!exitcode)
@@ -478,7 +550,7 @@ int main(int argc, char **argv)
       if (exitcode) {
 	fprintf(stderr, "%s: can't write results.\n", progname);
 	exitcode = -25;
-	goto exit8;
+	goto exit11;
       }
 
       unlink(opt.outfn->filename[0]);
@@ -495,8 +567,26 @@ int main(int argc, char **argv)
   }
   exitcode = 0;
 
- exit8:
+ exit11:
+  if (lp) {
+#ifdef MPI
+    MPI_File_close(lp);
+#else
+    fclose(lp);
+#endif
+  }
+ exit10:
   free(fntmp);
+ exit9:
+  d.s->del(d.s);
+ exit8:
+  if (is) {
+#ifdef MPI
+    MPI_File_close(lp);
+#else
+    fclose(lp);
+#endif    
+  }
  exit7:
   if (!rank)
     free(ss);
