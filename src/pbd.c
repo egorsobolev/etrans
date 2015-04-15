@@ -1,15 +1,8 @@
-#include "config.h"
 #include "pbd.h"
 
 #include <time.h>
 #include <string.h>
 #include <math.h>
-
-#ifdef USE_MKL
-# include <mkl.h>
-#else
-# include <gsl/gsl_cblas.h>
-#endif
 
 charge_parm_t pbd_charge_defs = {
   8.809624572754315, 0.0,/* chi_e */
@@ -20,160 +13,93 @@ charge_parm_t pbd_charge_defs = {
     8.9558817839739,   6.1838231365534,  21.3235280570807,   8.7426465034031  /* CG CA CT CC */
 };
 
-real_t ekin_pbd(int n, const real_t *v)
-{
-  real_t e;
-  e = 0.5 * cblas_dot(n, v, 1, v, 1);
-  return e;
-}
-
-real_t epot_pbd(const chain_eq_t *chain, const real_t *u)
+real_t pbd_en_potential(const chain_eq_t *chain, const real_t *u)
 {
   real_t e1, e2, a;
   int i;
   const pbd_chain_t *c = (pbd_chain_t *) chain;
   e1 = 0.0;
   for (i = 0; i < c->n; i++) {
-    a = exp(-c->sigma * u[i]) - 1.0;
+    a = _exp(-c->sigma * u[i]) - 1.0;
     e1 += a * a;
   }
   e2 = 0.0;
   for (i = 0; i < c->n1; i++) {
     a = u[i+1] - u[i];
-    e2 += (1.0 + c->rho * exp(-c->epsilon * (u[i] + u[i+1]))) * a * a;
+    e2 += (1.0 + c->rho * _exp(-c->epsilon * (u[i] + u[i+1]))) * a * a;
   }
   return 0.5 * (c->omegaM2 * e1 + c->omegaB2 * e2);
 }
 
-void eq_pbd(const chain_eq_t *chain, const real_t *x, real_t *dx)
+void pbd_dv(const chain_eq_t *chain, const real_t *x, real_t *dv)
 {
-  real_t *dv;
-  const real_t *v;
   int i;
   real_t A, Er, El, Dr, Dl;
   const pbd_chain_t *c = (pbd_chain_t *) chain;
+  const real_t *v;
 
-  dv = dx + c->n;
   v = x + c->n;
-  cblas_copy(c->n, v, 1, dx, 1);
 
-  A = exp(-c->sigma * x[0]);
+  A = _exp(-c->sigma * x[0]);
   Dr = x[0] - x[1];
-  Er = c->rho * exp(-c->epsilon * (x[0] + x[1])); 
+  Er = c->rho * _exp(-c->epsilon * (x[0] + x[1])); 
   dv[0] = c->omegaM2 * (A - 1.0) * A +
     c->omegaB2 * Dr * (0.5 * c->epsilon * (Dr * Er) - Er - 1.0)
     - c->Gamma * v[0];
 
   for (i = 1; i < c->n1; ++i) {
-    A = exp(-c->sigma * x[i]);
+    A = _exp(-c->sigma * x[i]);
     Dl = x[i] - x[i-1];
     Dr = x[i] - x[i+1];
-    El = c->rho * exp(-c->epsilon * (x[i-1] + x[i]));
-    Er = c->rho * exp(-c->epsilon * (x[i+1] + x[i])); 
+    El = c->rho * _exp(-c->epsilon * (x[i-1] + x[i]));
+    Er = c->rho * _exp(-c->epsilon * (x[i+1] + x[i])); 
     dv[i] = c->omegaM2 * (A - 1.0) * A + c->omegaB2 * 
       (
        Dl * (0.5 * c->epsilon * (Dl * El) - El - 1.0) +
        Dr * (0.5 * c->epsilon * (Dr * Er) - Er - 1.0)
        ) - c->Gamma * v[i];
   }
-  A = exp(-c->sigma * x[c->n1]);
+  A = _exp(-c->sigma * x[c->n1]);
   Dl = x[c->n1] - x[c->n1-1];
-  El = c->rho * exp(-c->epsilon * (x[c->n1-1] + x[c->n1])); 
+  El = c->rho * _exp(-c->epsilon * (x[c->n1-1] + x[c->n1])); 
   dv[c->n1] = c->omegaM2 * (A - 1.0) * A +
     c->omegaB2 * Dl * (0.5 * c->epsilon * (Dl * El) - El - 1.0)
     - c->Gamma * v[c->n1];
 }
 
-void eq_pbd_holstein(const chain_eq_t *chain, const real_t *x, real_t *dx, real_t *b2)
+void pbd_holstein_dv(const chain_eq_t *chain, const real_t *x, real_t *dv, real_t *b2)
 {
-  real_t *dv;
-  const real_t *v;
   int i;
   real_t A, Er, El, Dr, Dl;
   const pbd_chain_t *c = (pbd_chain_t *) chain;
+  const real_t *v;
 
-  dv = dx + c->n;
   v = x + c->n;
-  cblas_copy(c->n, v, 1, dx, 1);
 
-  A = exp(-c->sigma * x[0]);
+  A = _exp(-c->sigma * x[0]);
   Dr = x[0] - x[1];
-  Er = c->rho * exp(-c->epsilon * (x[0] + x[1])); 
+  Er = c->rho * _exp(-c->epsilon * (x[0] + x[1])); 
   dv[0] = c->omegaM2 * (A - 1.0) * A + 
     c->omegaB2 * Dr * (0.5 * c->epsilon * (Dr * Er) - Er - 1.0)
     - c->Gamma * v[0] - c->chi * b2[0];
 
   for (i = 1; i < c->n1; ++i) {
-    A = exp(-c->sigma * x[i]);
+    A = _exp(-c->sigma * x[i]);
     Dl = x[i] - x[i-1];
     Dr = x[i] - x[i+1];
-    El = c->rho * exp(-c->epsilon * (x[i-1] + x[i]));
-    Er = c->rho * exp(-c->epsilon * (x[i+1] + x[i])); 
+    El = c->rho * _exp(-c->epsilon * (x[i-1] + x[i]));
+    Er = c->rho * _exp(-c->epsilon * (x[i+1] + x[i])); 
     dv[i] = c->omegaM2 * (A - 1.0) * A + c->omegaB2 * 
       (Dl * (0.5 * c->epsilon * (Dl * El) - El - 1.0) +
        Dr * (0.5 * c->epsilon * (Dr * Er) - Er - 1.0))
       - c->Gamma * v[i] - c->chi * b2[i];
   }
-  A = exp(-c->sigma * x[c->n1]);
+  A = _exp(-c->sigma * x[c->n1]);
   Dl = x[c->n1] - x[c->n1-1];
-  El = c->rho * exp(-c->epsilon * (x[c->n1-1] + x[c->n1])); 
+  El = c->rho * _exp(-c->epsilon * (x[c->n1-1] + x[c->n1])); 
   dv[c->n1] = c->omegaM2 * (A - 1.0) * A + 
     c->omegaB2 * Dl * (0.5 * c->epsilon * (Dl * El) - El - 1.0)
     - c->Gamma * v[c->n1] - c->chi * b2[c->n1];
-}
-
-void runge_pbd(chain_eq_t *chain, real_t h, real_t *x)
-{
-  real_t sqrth, h_2, *y, *k1, *k2;
-  int i, m;
-  pbd_chain_t *c = (pbd_chain_t *) chain;
-
-  sqrth = _sqrt(h) * c->sigmaF;
-  h_2 = 0.5 * h;
-  m = 2 * c->n;
-  y = c->runge_temp;
-  k1 = y + m;
-  k2 = k1 + m;
-
-  cblas_copy(m, x, 1, y, 1);
-
-  rnd_gaussian(c->n, x + c->n, 1.0);
-  /* memset(x + o->n, 0, o->n * sizeof(float)); */
-
-  for (i = c->n; i < m; ++i)
-    x[i] = sqrth * x[i] + y[i];
-  eq_pbd(chain, x, k1);
-  cblas_axpy(m, h, k1, 1, y, 1);
-  eq_pbd(chain, y, k2);
-  cblas_axpy(m, h_2, k1, 1, x, 1);
-  cblas_axpy(m, h_2, k2, 1, x, 1);
-}
-
-void runge_pbd_holstein(chain_eq_t *chain, real_t h, real_t *x, real_t *b0, real_t *b1)
-{
-  real_t sqrth, h_2, *y, *k1, *k2;
-  int i, m;
-  pbd_chain_t *c = (pbd_chain_t *) chain;
-
-  sqrth = _sqrt(h) * c->sigmaF;
-  h_2 = 0.5 * h;
-  m = 2 * c->n;
-  y = c->runge_temp;
-  k1 = y + m;
-  k2 = k1 + m;
-
-  cblas_copy(m, x, 1, y, 1);
-
-  rnd_gaussian(c->n, x + c->n, 1.0);
-  /*memset(x + o->n, 0, o->n * sizeof(float));*/
-
-  for (i = c->n; i < m; ++i)
-    x[i] = sqrth * x[i] + y[i];
-  eq_pbd_holstein(chain, x, k1, b0);
-  cblas_axpy(m, h, k1, 1, y, 1);
-  eq_pbd_holstein(chain, y, k2, b1);
-  cblas_axpy(m, h_2, k1, 1, x, 1);
-  cblas_axpy(m, h_2, k2, 1, x, 1);
 }
 
 void pbd_equilibrate(chain_eq_t *chain)
@@ -202,16 +128,17 @@ void pbd_equilibrate(chain_eq_t *chain)
   fwrite(&m, sizeof(int), 1, f);
 
   /* heating */
-  ek2 = 0.5 * cblas_dot(c->n, v, 1, v, 1) / c->n;
+  ek2 = en_kinetic(c->n, v);
 
   m = 0;
   i = 0;
   while (i < 1000) {
-    runge_pbd(chain, c->h, c->f0);
-    ek = 0.5 * cblas_dot(c->n, v, 1, v, 1) / c->n;
+    rk_2o2s1g(chain, c->runge_temp, c->h, c->f0);
+    ek2 = en_kinetic(c->n, v);
+
     i += ((2.0 * ek2 - c->theta) * (2.0 * ek - c->theta)) < 0.0;
 
-    ep = epot_pbd(chain, u) / c->n;
+    ep = pbd_en_potential(chain, u) / c->n;
 
     fwrite(&ek, sizeof(real_t), 1, f);
     fwrite(&ep, sizeof(real_t), 1, f);
@@ -224,7 +151,7 @@ void pbd_equilibrate(chain_eq_t *chain)
   /* autocorrelation function */
   for (i = nr - 1; i >= 0; i--) {
     for (j = 0; j < nskip; j++)
-      runge_pbd(chain, c->h, c->f0);
+      rk_2o2s1g(chain, c->runge_temp, c->h, c->f0);
     memcpy(t + i * c->n, u, c->n * sizeof(real_t)); 
     /*t[i] = u[s0]*/;
   }
@@ -234,7 +161,7 @@ void pbd_equilibrate(chain_eq_t *chain)
   memset(r, 0, nr * c->n * sizeof(real_t));
   for (i = 0; i < 10000; i++) {
     for (j = 0; j < nskip; j++)
-      runge_pbd(chain, c->h, c->f0);
+      rk_2o2s1g(chain, c->runge_temp, c->h, c->f0);
     for (j = 0; j < c->n; j++) {
       Mu[j] += u[j];
       Du[j] += u[j] * u[j];
@@ -246,31 +173,11 @@ void pbd_equilibrate(chain_eq_t *chain)
 	t[l] = t[l - c->n];
 	l--;
       }
-      /*
-	r[j] += cblas_dot(c->n, u, 1, t + j * c->n, 1);
-	memcpy(t + j * c->n, t + j * c->n - c->n, c->n * sizeof(real_t));
-      */
     }
     for (k = c->n - 1; k >=0; k--) {
       r[k] += u[k] * t[k];
       t[k] = u[k];
     }
-    /*
-    r[0] += cblas_dot(c->n, u, 1, t, 1);
-    memcpy(t, u, sizeof(real_t));
-    */
-
-    /*
-    a = u[s0];
-    Mu += a;
-    Du += a * a;
-    for (j = 99; j > 0; j--) {
-      r[j] += a * t[j];
-      t[j] = t[j-1];
-    }
-    r[0] += a * t[0];
-    t[0] = a;
-    */
   }
 
   for (k = 0; k < c->n; k++) {
@@ -284,12 +191,6 @@ void pbd_equilibrate(chain_eq_t *chain)
       l++;
     }
 
-  /*
-  a = Mu * Mu / (10000.0 * c->n);
-  Du -= a;
-  for (j = 0; j < nr; j++)
-    r[j] = (r[j] - a) / Du;
-  */
 
   fwrite(r, sizeof(real_t), nr * c->n, f);
 
@@ -308,7 +209,7 @@ void pbd_x0_rand(chain_eq_t *chain, real_t *x)
 
   n = 50000;
   for (i = 0; i < n; ++i)
-    runge_pbd(chain, c->h, c->f0);
+    rk_2o2s1g(chain, c->runge_temp, c->h, c->f0);
 
   memcpy(x, c->f0, 2 * c->n * sizeof(real_t));
 }
@@ -327,7 +228,7 @@ int pbd_init(chain_eq_t *chain, etrans_opt_t *o)
   c->theta0 = 1.07716655e-3;
   if (o->temp->count)
     c->theta = c->theta0 * o->temp->dval[0];
-  c->sigmaF = _sqrt(2.0 * c->theta * c->Gamma);
+  c->sigF = _sqrt(2.0 * c->theta * c->Gamma);
 
   if (o->omegaM2->count)
     c->omegaM2 = o->omegaM2->dval[0]; /* 1.0 */
@@ -360,7 +261,7 @@ int pbd_write(const chain_eq_t *chain, FILE *f)
   fcnt = fwrite("PBD", sizeof(char), 3, f);
   if (fcnt != 3)
     return -1;
-  fcnt = fwrite(&c->omegaM2, sizeof(real_t), 10, f);
+  fcnt = fwrite(&c->sigF, sizeof(real_t), 10, f);
   if (fcnt != 10)
     return -1;
 
@@ -372,7 +273,7 @@ int pbd_read(chain_eq_t *chain, FILE *f)
   pbd_chain_t *c = (pbd_chain_t *) chain;
   size_t fcnt;
 
-  fcnt = fread(&c->omegaM2, sizeof(real_t), 10, f);
+  fcnt = fread(&c->sigF, sizeof(real_t), 10, f);
   if (fcnt != 10)
     return -1;
 
@@ -381,7 +282,7 @@ int pbd_read(chain_eq_t *chain, FILE *f)
 
 size_t pbd_nbytes(int n)
 {
-  return sizeof(pbd_chain_t) + 8 * n * sizeof(real_t);
+  return sizeof(pbd_chain_t) + 6 * n * sizeof(real_t);
 }
 
 pbd_chain_t *mk_pbd(int n)
@@ -407,7 +308,7 @@ pbd_chain_t *mk_pbd(int n)
   c->Gamma = 0.084212403085279;
   c->theta0 = 1.07716655e-3;
   c->theta = c->theta0 * 300;
-  c->sigmaF = _sqrt(2.0 * c->theta * c->Gamma);
+  c->sigF = _sqrt(2.0 * c->theta * c->Gamma);
 
   c->omegaM2 = 1.0;
   c->sigma = 1.0;
@@ -420,15 +321,12 @@ pbd_chain_t *mk_pbd(int n)
 
   c->h = 0.005 / _sqrt(c->omegaM2 > c->omegaB2 ? c->omegaM2 : c->omegaB2); 
 
-
-  c->step_autonomic = &runge_pbd;
-  c->step_coupled = &runge_pbd_holstein;
-  c->eq_autonomic = &eq_pbd;
-  c->eq_coupled = &eq_pbd_holstein;
+  c->dv = &pbd_dv;
+  c->dv_hst = &pbd_holstein_dv;
   c->equilibrate = &pbd_equilibrate;
   c->x0 = &pbd_x0_rand;
   c->del = &pbd_free;
-  c->en_potential = &epot_pbd;
+  c->en_potential = &pbd_en_potential;
   c->init = &pbd_init;
   c->write = &pbd_write;
   c->read = &pbd_read;

@@ -1,5 +1,5 @@
-#ifndef __ETRANS_MORSE_H
-#define __ETRANS_MORSE_H
+#ifndef __ETRANS_OSC_H
+#define __ETRANS_OSC_H
 
 #include "config.h"
 #include "types.h"
@@ -12,10 +12,8 @@ charge_parm_t osc_charge_defs;
 struct OSCILATOR
 {
   /* inherited fields */
-  autonomic_chain_step_f *step_autonomic;
-  coupled_chain_step_f *step_coupled;
-  autonomic_chain_eq_f *eq_autonomic;
-  coupled_chain_eq_f *eq_coupled;
+  chain_dv_f *dv;
+  chain_dv_hst_f *dv_hst;
   chain_equilibrate_f *equilibrate;
   en_potential_f *en_potential;
   chain_x0_f *x0;
@@ -25,15 +23,15 @@ struct OSCILATOR
   chain_read_f *read;
   chain_nbytes_f *nbytes;
 
+  int n;
   real_t h;
+  real_t sigF;
 
   /* own fields */
   real_t kt;
-  real_t D, K, L, mu, sigF;
+  real_t D, K, L, mu;
   real_t su, sv;
-  int n, n1;
-
-  real_t *runge_temp;
+  int n1;
 };
 typedef struct OSCILATOR oscilator_t;
 

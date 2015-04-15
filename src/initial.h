@@ -53,13 +53,17 @@ struct INITIAL_SET
   initial_del_f *del;
   initial_nbytes_f *nbytes;
 
-  SFILE *f;
+#ifdef MPI
+  MPI_File fh;
+#else
+  FILE *fh;
+#endif
   int os, sl, l, n;
   real_t *x0;
 };
 typedef struct INITIAL_SET initial_set_t;
 
-initial_set_t *mk_initial_set(SFILE *f, int from, int n, int n0);
+initial_set_t *mk_initial_set(const char *fh, int from, int n, int n0);
 
 
 #endif //__ETRANS_INITIAL_H

@@ -9,7 +9,7 @@ CFLAGS= -O3 -funroll-all-loops -ffast-math -fno-trapping-math
 # MATHLIB
 # GSL
 #MATHCFLAGS=
-#MATHLFLAGS= -llapack -lgsl -lgslcblas 
+#MATHLFLAGS= -lgsl -lgslcblas
 
 # MKL
 MKLROOT=/opt/intel/mkl

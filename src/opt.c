@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NOPTION 30
+#define NOPTION 29
 
 void **argtable_mk(etrans_opt_t *o)
 {
@@ -20,12 +20,11 @@ void **argtable_mk(etrans_opt_t *o)
   t[i++] = o->logfn = arg_file0("l", NULL, NULL, "log file");
   t[i++] = o->init = arg_str0("y", NULL, NULL, "initial state type: 1, P, S (1)");
   t[i++] = o->initfn = arg_file0("I", NULL, NULL, "initial state file");
-  t[i++] = o->lpfn = arg_file0("w", NULL, NULL, "file of last point for each sample"); 
+  t[i++] = o->lpfn = arg_file0("w", NULL, NULL, "file of final point set"); 
   t[i++] = o->rst = arg_lit0("c", NULL, "continue from control point");
   t[i++] = o->nsamp = arg_int1("N", NULL, NULL, "number of samples per processor");
   t[i++] = o->tmax = arg_dbl0("t", NULL, NULL, "trajectory time (600)");
   t[i++] = o->h = arg_dbl0("h", NULL, NULL, "time step (0.2)");
-  t[i++] = o->na = arg_int0("H", NULL, NULL, "frequency of adaptive step revision (15)");
   t[i++] = o->no = arg_int0("Q", NULL, NULL, "output step (1)");
   t[i++] = o->temp = arg_dbl0("T", NULL, NULL, "T - temperature, K (300)");
   t[i++] = o->gamma = arg_dbl0("F", NULL, NULL, "gamma - friction (6.0e-3)");
@@ -57,7 +56,6 @@ void **argtable_mk(etrans_opt_t *o)
 
   o->tmax->dval[0] = 600.0;
   o->h->dval[0] = 0.2;
-  o->na->ival[0] = 15;
   o->no->ival[0] = 1;
   o->temp->dval[0] = 300;
   o->gamma->dval[0] = 6E-3;

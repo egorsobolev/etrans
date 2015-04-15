@@ -1,5 +1,7 @@
 #include "rnd.h"
 
+rnd_stream_p rnd;
+
 #ifdef USE_MKL
 
 #ifdef USE_SINGLE
@@ -9,8 +11,6 @@
 # define vRngGaussian vdRngGaussian
 # define vRngUniform vdRngUniform
 #endif
-
-rnd_stream_p rnd;
 
 void rnd_uniform_int(int n, int *x, int mx)
 {
@@ -49,14 +49,14 @@ void rnd_uniform_int(int n, int *x, int mx)
 {
   int i;
   for (i = 0; i < n; ++i)
-    x[i] = gsl_rng_uniform_int(rnd, mx);;
+    x[i] = gsl_rng_uniform_int(rnd, mx);
 }
 
 void rnd_uniform(int n, real_t *x, real_t mx)
 {
   int i;
   for (i = 0; i < n; ++i)
-    x[i] = gsl_rng_uniform(rnd, mx);;
+    x[i] = gsl_rng_uniform(rnd) * mx;
 }
 
 void rnd_gaussian(int n, real_t *x, real_t sigma)

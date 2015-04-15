@@ -29,12 +29,10 @@ size_t charge_nbytes(int n);
 charge_eq_t *mk_charge(int n, int n0, charge_parm_t *def);
 int charge_init(charge_eq_t *eq, etrans_opt_t *o);
 void charge_del(charge_eq_t *eq);
-
-real_t charge_expM(charge_eq_t *eq, int m, real_t h0, real_t sn, real_t cs, const real_t *u, const real_t *v, real_t *sr, real_t *si);
-void charge_step_adj(charge_eq_t *eq, real_t h, int revstep, const real_t *u, const real_t *v, const real_t *sr, const real_t *si,
-                        int *nskip, real_t *h0, real_t *sn, real_t *cs, real_t *s0);
-
 int charge_write(const charge_eq_t *eq, FILE *f);
 int charge_read(charge_eq_t *eq, FILE *f);
+
+void expmv(int n, real_t *bi, real_t* cr, real_t *ci, real_t *sr, real_t *si, real_t *wrk, real_t *er, real_t *ei, int *scl);
+
 
 #endif /* __ETRAMS_CHARGE_H */

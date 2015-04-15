@@ -5,6 +5,9 @@
 TODO.txt
 bin/*
 test/
+mu/
+sol/
+current/
 src/.o.mpi/
 src/.o.serial/
 argtable2*

@@ -69,22 +69,22 @@ r.h = fread(f, 1, 'double');
 r.chain = fread(f, 3, '*char')';
 if strcmp(r.chain, 'OSC')
     p = fread(f, 6, 'double');
-    r.eq.kt = p(1);
-    r.eq.omegaB2 = p(2);
-    r.eq.omegaM2 = p(3);
-    r.eq.Gamma = p(4);
-    r.eq.chi_c = p(5);
-    r.eq.sigmaF = p(6);
+    r.eq.sigmaF = p(1);
+    r.eq.kt = p(2);
+    r.eq.omegaB2 = p(3);
+    r.eq.omegaM2 = p(4);
+    r.eq.Gamma = p(5);
+    r.eq.chi_c = p(6);
 elseif strcmp(r.chain, 'PBD')
     p = fread(f, 10, 'double');
-    r.eq.omegaM2 = p(1);
-    r.eq.sigma = p(2);
-    r.eq.omegaB2 = p(3);
-    r.eq.epsilon = p(4);
-    r.eq.rho = p(5);
-    r.eq.theta0 = p(6);
-    r.eq.theta = p(7);
-    r.eq.sigmaF = p(8);
+    r.eq.sigmaF = p(1);
+    r.eq.omegaM2 = p(2);
+    r.eq.sigma = p(3);
+    r.eq.omegaB2 = p(4);
+    r.eq.epsilon = p(5);
+    r.eq.rho = p(6);
+    r.eq.theta0 = p(7);
+    r.eq.theta = p(8);
     r.eq.Gamma = p(9);
     r.eq.chi_c = p(10);
 else

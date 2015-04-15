@@ -15,9 +15,6 @@ struct EQDATA
   long nstep;
   real_t h;
   int nskip;
-  int h_revstep;
-
-  /*real_t *x0;*/
 
   charge_eq_t *ch;
   chain_eq_t *chain;

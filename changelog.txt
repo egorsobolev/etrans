@@ -1,3 +1,18 @@
+2015-04-15 Egor Sobolev <egor@impb.psn.ru>
+ * added functionals x = sum(n * |b(n)|^2, n=1...N), dx = sum(n * d|b(n)|^2, n=1...N)
+ * improved trajectory log records
+ * added doc/exitcodes.txt
+ * modified thomas procedure to process sub- and superdiagonal as complex with inverse real part and equal imaginary part
+ * modified expmv procedure to shift on smalest diagonal number and scale on l-norm
+ * modified numeric sheme to calculate new quantum values before last runge step
+ * added 4th order calculation of quantum matrix integral on step with Magnus expansion and Simpson's rule
+ * added entropy functional S=P[n]*log(P[n])
+ * removed cblas and clapack calls
+ * fixed bugs rnd.c related to gsl 
+ * refactor chain class to provide only dv and dv_hst and implemented implicit du calculation inside schemes
+ * fixed reading initial states (-y S) after eof in mpi mode
+ * fixed error of restarting with final point set writing
+
 2015-02-24 Egor Sobolev <egor@impb.psn.ru>
  * fixed bug of reading quantum parameters from file
  * added memory usage info into log exclude seq & pbd_equlibrate

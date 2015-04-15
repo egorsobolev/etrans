@@ -1,6 +1,8 @@
 #include "sol.h"
 #include "chain.h"
 
+#include <math.h>
+
 void int_Eu(const eqdata_t *eq, const real_t *x, const real_t *b2, const real_t *dx, const real_t *d2x, double *r)
 {
   *r = eq->chain->en_potential(eq->chain, x + 2 * eq->n);
@@ -20,6 +22,53 @@ void int_Ev(const eqdata_t *eq, const real_t *x, const real_t *b2, const real_t 
     e += v[i] * v[i];
   }
   *r = 0.5 * e;
+}
+
+void int_S(const eqdata_t *eq, const real_t *x, const real_t *b2, const real_t *dx, const real_t *d2x, double *r)
+{
+  int i;
+  double s;
+
+  s = 0.0;
+  for (i = 0; i < eq->n; ++i) {
+    if (b2[i] > 0.0)
+      s += b2[i] * _log(b2[i]);
+  }
+  *r = s;
+}
+
+void int_x(const eqdata_t *eq, const real_t *x, const real_t *b2, const real_t *dx, const real_t *d2x, double *r)
+{
+  int i;
+  double j, x2;
+
+  x2 = 0.0;
+  j = (double) -eq->ch->n0;
+  for (i = 0; i < eq->n; ++i) {
+    x2 += (double) b2[i] * j;
+    j += 1.0;
+  }
+  *r = x2;
+}
+
+void int_dx(const eqdata_t *eq, const real_t *x, const real_t *b2, const real_t *dx, const real_t *d2x, double *r)
+{
+  int n, i;
+  double j, x2;
+
+  const real_t *y, *dy;
+
+  n = eq->n;
+  y = x + n;
+  dy = dx + n;
+
+  x2 = 0.0;
+  j = (double) -eq->ch->n0;
+  for (i = 0; i < n; ++i) {
+    x2 += (double) 2.0 * (x[i] * dx[i] + y[i] * dy[i]) * j;
+    j += 1.0;
+  }
+  *r = x2;
 }
 
 void int_x2(const eqdata_t *eq, const real_t *x, const real_t *b2, const real_t *dx, const real_t *d2x, double *r)
@@ -186,6 +235,8 @@ long size_chain_scalar(int n, int nstep)
 }
 
 int_func_t int_func[MAX_FUNC] = {
+  "x", &int_x, &size_scalar_traj, &len_scalar,
+  "dx", &int_dx, &size_scalar_traj, &len_scalar,
   "x2", &int_x2, &size_scalar_traj, &len_scalar,
   "dx2", &int_dx2, &size_scalar_traj, &len_scalar,
   "d2x2", &int_d2x2, &size_scalar_traj, &len_scalar,
@@ -195,6 +246,7 @@ int_func_t int_func[MAX_FUNC] = {
   "Ev", &int_Ev, &size_scalar_traj, &len_scalar,
   "invb4", &int_invb4, &size_scalar_traj, &len_scalar,
   "j", &int_j, &size_scalar_traj, &len_scalar,
+  "S", &int_S, &size_scalar_traj, &len_scalar,
   "p", &cp_b2, &size_chain_traj, &len_chain,
   "u", &cp_u, &size_chain_traj, &len_chain,
   "v", &cp_v, &size_chain_traj, &len_chain,

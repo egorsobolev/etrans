@@ -12,10 +12,8 @@ charge_parm_t pbd_charge_defs;
 struct PBDChain
 {
   /* inherited fields */
-  autonomic_chain_step_f *step_autonomic;
-  coupled_chain_step_f *step_coupled;
-  autonomic_chain_eq_f *eq_autonomic;
-  coupled_chain_eq_f *eq_coupled;
+  chain_dv_f *dv;
+  chain_dv_hst_f *dv_hst;
   chain_equilibrate_f *equilibrate;
   en_potential_f *en_potential;
   chain_x0_f *x0;
@@ -25,14 +23,16 @@ struct PBDChain
   chain_read_f *read;
   chain_nbytes_f *nbytes;
 
+  int n;
   real_t h;
+  real_t sigF;
 
   /* own fields */
-  int n, n1;
   real_t omegaM2, sigma;
   real_t omegaB2, epsilon, rho;
-  real_t theta0, theta, sigmaF;
+  real_t theta0, theta;
   real_t Gamma, chi;
+  int n1;
   real_t *f0;
 
   real_t *runge_temp;

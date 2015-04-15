@@ -8,10 +8,8 @@
 
 typedef struct CHAIN_EQUATION chain_eq_t;
 
-typedef void autonomic_chain_step_f(chain_eq_t *o, real_t h, real_t *x);
-typedef void coupled_chain_step_f(chain_eq_t *o, real_t h, real_t *x, real_t *b0, real_t *b1);
-typedef void autonomic_chain_eq_f(const chain_eq_t *o, const real_t *x, real_t *dx);
-typedef void coupled_chain_eq_f(const chain_eq_t *o, const real_t *x, real_t *dx, real_t *b2);
+typedef void chain_dv_f(const chain_eq_t *o, const real_t *x, real_t *dx);
+typedef void chain_dv_hst_f(const chain_eq_t *o, const real_t *x, real_t *dx, real_t *b2);
 
 typedef void chain_equilibrate_f(chain_eq_t *chain);
 typedef void chain_del_f(chain_eq_t *o);
@@ -28,10 +26,8 @@ typedef size_t chain_nbytes_f(int n);
 
 struct CHAIN_EQUATION
 {
-  autonomic_chain_step_f *step_autonomic;
-  coupled_chain_step_f *step_coupled;
-  autonomic_chain_eq_f *eq_autonomic;
-  coupled_chain_eq_f *eq_coupled;
+  chain_dv_f *dv;
+  chain_dv_hst_f *dv_hst;
   chain_equilibrate_f *equilibrate;
   en_potential_f *en_potential;
   chain_x0_f *x0;
@@ -41,8 +37,12 @@ struct CHAIN_EQUATION
   chain_read_f *read;
   chain_nbytes_f *nbytes;
 
+  int n;
   real_t h;
+  real_t sigF;
 };
 
+void rk_2o2s1g(chain_eq_t *c, real_t *wrk, real_t h, real_t *x);
+real_t en_kinetic(int n, const real_t *v);
 
 #endif /*  __ETRANS_CHAIN_H */

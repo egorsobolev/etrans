@@ -6,33 +6,14 @@
 #include "initial.h"
 
 #include "sol.h"
+#include "fpset.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
 #include <float.h>
-
 #include <math.h>
-#ifdef USE_MKL
-# include <mkl.h>
-#else
-# include <gsl/gsl_cblas.h>
-
-void vdMul(int n, const double *a, const double *b, double *y)
-{
-   int i;
-   for (i = 0; i < n; ++i)
-     y[i] = a[i] * b[i];
-}
-void vdSqrt(int n, const double *a, double *y)
-{
-   int i;
-   for (i = 0; i < n; ++i)
-     y[i] = sqrt(a[i]);
-}
-
-#endif
 
 #ifdef WIN32
 #define unlink _unlink
@@ -52,7 +33,7 @@ void vdSqrt(int n, const double *a, double *y)
 #include "opt.h"
 
 
-int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res, SFILE *lp);
+int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res);
 
 int eq_read_head(eqdata_t *d, FILE *f)
 {
@@ -101,8 +82,9 @@ int main(int argc, char **argv)
   void **argtable;
   char *seq, *progname = "etrans", *fntmp;
   int nsamp, exitcode, nerrors, qn, i, heat_nstep, nfunc, ndone, n0;
+  long k;
   size_t fnlen, fcnt;
-  real_t tmax, heat_h;
+  real_t tmax, heat_h, a;
   double *rbuf, wtm0, wtm1, elapse, droptime;
   eqdata_t d;
   sol_meta_t sol_meta[MAX_FUNC];
@@ -114,18 +96,10 @@ int main(int argc, char **argv)
   charge_parm_t charge_parm;
   char mdl[4];
   size_t nb, tmem;
-#ifdef MPI
-  MPI_File mpi_lp, mpi_is;
-  MPI_File *lp, *is;
-  lp = NULL;
-  is = NULL;
-#else
-  FILE *lp, *is;
-#endif
 
   argtable = argtable_mk(&opt);
   if (!argtable) {
-    fprintf(stderr, "%s: insufficient memory\n", progname);
+    fprintf(stderr, "%s: insufficient memory to allocate argtable.\n", progname);
     exit(-1);
   }
   nerrors = arg_parse(argc, argv, argtable);
@@ -138,9 +112,9 @@ int main(int argc, char **argv)
     goto exit;
   }
   if (opt.ver->count > 0){
-    printf("etrans 0.14 20-09-2014\n");
+    printf("etrans 1.0 24-02-2015\n");
     printf("Authors: Egor Sobolev and Dmitry Tikhonov\n");
-    printf("Copyright (C) 2011-2014 Institute of Mathematical Problems of Biology RAS\n");
+    printf("Copyright (C) 2011-2015 Institute of Mathematical Problems of Biology RAS\n");
     exitcode = 0;
     goto exit;
   }
@@ -191,21 +165,21 @@ int main(int argc, char **argv)
     }
     /* read head */
     if (eq_read_head(&d, f)) {
-      fprintf(stderr, "%s: can't read output file.\n", progname);
+      fprintf(stderr, "%s: can't read header from restart/output file.\n", progname);
       exitcode = -8;
       goto exit2;
     }
     tmax = d.h * d.nstep * d.nskip;
     /* read chain */
     if (fread(mdl, sizeof(char), 3, f) != 3) {
-      fprintf(stderr, "%s: can't read output file.\n", progname);
+      fprintf(stderr, "%s: can't read chain name from output file.\n", progname);
       exitcode = -8;
       goto exit2;
     }
   } else {
     /* read sequence */
     if (!opt.seqfn->count) {
-      fprintf(stderr, "-s <file> or -c must be in line\n");
+      fprintf(stderr, "-s <file> or -c must be specified.\n");
       fprintf(stderr, "Try '%s --help' for more information.\n", progname);
       exitcode = -2;
       goto exit2;
@@ -237,13 +211,13 @@ int main(int argc, char **argv)
       f = fopen(opt.outsh->filename[0], "rt");
       if (!f) {
 	fprintf(stderr, "%s: can't open file of output sheme.\n", progname);
-	exitcode = -5;
+	exitcode = -9;
 	goto exit3;
       }
       nfunc = sol_scan_meta(f, sol_meta);
       if (nfunc < 0) {
-	fprintf(stderr, "%s: invalid format of output sheme file.\n", progname);
-	exitcode = -5;
+	fprintf(stderr, "%s: can't read output sheme from file.\n", progname);
+	exitcode = -10;
 	goto exit3;
       }
       fclose(f);
@@ -267,20 +241,20 @@ int main(int argc, char **argv)
     d.chain = NULL;
 
   if (!d.chain) {
-    fprintf(stderr, "%s: insufficient memory\n", progname);
+    fprintf(stderr, "%s: insufficient memory to allocate chain data\n", progname);
     exitcode = -11;
     goto exit2;
   }
   if (rst) {
     /* !!! what do with seq? !!! */
     if (d.chain->read(d.chain, f)) {
-      fprintf(stderr, "%s: chain read error\n", progname);
+      fprintf(stderr, "%s: can't read chain data.\n", progname);
       exitcode = -13;
       goto exit4;
     }
   } else {
     if (d.chain->init(d.chain, &opt)) {
-      fprintf(stderr, "%s: chain init error\n", progname);
+      fprintf(stderr, "%s: initialization of chain failed.\n", progname);
       exitcode = -12;
       goto exit4;
     }
@@ -289,14 +263,14 @@ int main(int argc, char **argv)
       f = fopen(opt.prmfn->filename[0], "rt");
       if (!f) {
 	fprintf(stderr, "%s: can't open file of quantum parameters.\n", progname);
-	exitcode = -9;
+	exitcode = -14;
 	goto exit4;
       }
       fcnt = readparm(f, &charge_parm);
       fclose(f);
       if (fcnt) {
 	fprintf(stderr, "%s: can't read quantum parameters.\n", progname);
-	exitcode = -10;
+	exitcode = -15;
 	goto exit4;
       }
       charge_parm.chi = d.charge_parm->chi;
@@ -310,7 +284,7 @@ int main(int argc, char **argv)
     n0 = opt.n0->ival[0];
     if (n0 < 0 || n0 >= d.n) {
       fprintf(stderr, "%s: the origin must be inside the chain.\n", progname);
-      exitcode = -106;
+      exitcode = -16;
       goto exit4;
     }
   } else
@@ -318,26 +292,26 @@ int main(int argc, char **argv)
   
   d.ch = mk_charge(d.n, n0, d.charge_parm);
   if (!d.ch) {
-    fprintf(stderr, "%s: insufficient memory\n", progname);
-    exitcode = -14;
+    fprintf(stderr, "%s: insufficient memory to allocate charge data\n", progname);
+    exitcode = -17;
     goto exit4;
   }
   if (rst) {
     /* read charge */
     if (charge_read(d.ch, f)) {
-      fprintf(stderr, "%s: charge read error\n", progname);
-      exitcode = -17;
+      fprintf(stderr, "%s: can't read charge data\n", progname);
+      exitcode = -20;
       goto exit5;
     }
     if (fread(&ndone, sizeof(int), 1, f) != 1) {
       fprintf(stderr, "%s: nsamp read error\n", progname);
-      exitcode = -118;
+      exitcode = -21;
       goto exit5;
     }
     nfunc = sol_read_meta(f, sol_meta);
     if (nfunc <= 0) {
       fprintf(stderr, "%s: output sheme read error\n", progname);
-      exitcode = -119;
+      exitcode = -22;
       goto exit5;
     }
     fseek(f, nfunc * sizeof(int), SEEK_CUR);
@@ -345,28 +319,27 @@ int main(int argc, char **argv)
     /* init charge */
     if (seqdna(d.charge_parm, d.n, seq, d.ch->d, d.ch->s)) {
       fprintf(stderr, "%s: invalid symbol in sequence\n", progname);
-      exitcode = -15;
+      exitcode = -18;
       goto exit5;
     }
     if (charge_init(d.ch, &opt)) {
       fprintf(stderr, "%s: charge init error\n", progname);
-      exitcode = -16;
+      exitcode = -19;
       goto exit5;
     }
     ndone = 0;
   }
-  d.h_revstep = opt.na->ival[0];
 
   si = mk_sol(nfunc, sol_meta, d.n, d.nstep);
   if (!si) {
-    exitcode = -160;
+    exitcode = -23;
     fprintf(stderr, "%s: insufficient memory to allocate output fuctional\n", progname);
     goto exit5;
   }
   if (!rank) {
     ss = calloc(si->numel, sizeof(double));
     if (!ss) {
-      exitcode = -160;
+      exitcode = -24;
       fprintf(stderr, "%s: insufficient memory to allocate the summation buffer\n", progname);
       goto exit6;
     }
@@ -376,8 +349,8 @@ int main(int argc, char **argv)
   if (rst) {
     if (!rank) {
       if (fread(ss, sizeof(double), si->numel, f) != si->numel) {
-	fprintf(stderr, "%s: solution read error\n", progname);
-	exitcode = -19;
+	fprintf(stderr, "%s: can't read output functionals\n", progname);
+	exitcode = -25;
 	goto exit7;
       }
     }
@@ -392,13 +365,13 @@ int main(int argc, char **argv)
   } else if (!strcmp(opt.init->sval[0], "P")) {
     if (!opt.initfn->count) {
       fprintf(stderr, "%s: if -y P, you must specify initial state file (-I).\n", progname);
-      exitcode = 150;
+      exitcode = -28;
       goto exit7;
     }
     f = fopen(opt.initfn->filename[0], "r");
     if (!f) {
       fprintf(stderr, "%s: can't open initial state file.\n", progname);
-      exitcode = -21;
+      exitcode = -29;
       goto exit7;
     }
     d.s = (initial_t *) mk_initial_1state(f, d.n, d.ch->n0);
@@ -406,30 +379,18 @@ int main(int argc, char **argv)
   } else if (!strcmp(opt.init->sval[0], "S")) {
     if (!opt.initfn->count) {
       fprintf(stderr, "%s: if -y S, you must specify initial state file (-I).\n", progname);
-      exitcode = 150;
+      exitcode = -28;
       goto exit7;
     }
-#ifdef MPI
-    is = &mpi_is;
-    err = MPI_File_open(MPI_COMM_WORLD, opt.initfn->filename[0], MPI_MODE_RDONLY, MPI_INFO_NULL, is);
-#else
-    is = fopen(opt.initfn->filename[0], "r");
-    err = !is;
-#endif
-    if (err) {
-      fprintf(stderr, "%s: can't open initial state file.\n", progname);
-      exitcode = -21;
-      goto exit7;
-    }
-    d.s = (initial_t *) mk_initial_set(is, ndone, d.n, d.ch->n0);
+    d.s = (initial_t *) mk_initial_set(opt.initfn->filename[0], ndone, d.n, d.ch->n0);
   } else {
     fprintf(stderr, "%s: invalid value of -y.\n", progname);
-    exitcode = -151;
+    exitcode = -27;
     goto exit7;
   }
   if (!d.s) {
-    exitcode = -155;
-    fprintf(stderr, "%s: insufficient memory to allocate initial state structures.\n", progname);
+    exitcode = -26;
+    fprintf(stderr, "%s: can't construct initial state structure.\n", progname);
     goto exit8;
   }
 
@@ -437,8 +398,8 @@ int main(int argc, char **argv)
   nb = fnlen + 1;
   fntmp = (char *) malloc(nb);
   if (!fntmp) {
-    printf("%s: insufficient memory\n", progname);
-    exitcode = -20;
+    printf("%s: insufficient memory to allocate temporary filename.\n", progname);
+    exitcode = -30;
     goto exit9;
   }
 
@@ -452,29 +413,41 @@ int main(int argc, char **argv)
   */
 
   if (opt.lpfn->count) {
-#ifdef MPI
-    lp = &mpi_lp;
-    err = MPI_File_open(MPI_COMM_WORLD, opt.lpfn->filename[0], MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, lp);
-#else
-    lp = fopen(opt.lpfn->filename[0], "wb");
-    err = !lp;
-#endif
-    if (err) {
-      fprintf(stderr, "%s: can't open file of last points.\n", progname);
-      exitcode = 120;
+    if (rst) {
+      err = fpset_open(opt.lpfn->filename[0], d.ch->n, d.ch->n0, ndone);
+    } else {
+      err = fpset_create(opt.lpfn->filename[0], d.ch->n, d.ch->n0);
+    }
+    if (err == -1) {
+      fprintf(stderr, "%s: can't open file of final point set.\n", progname);
+      exitcode = -31;
       goto exit10;
+    } else if (err < 0) {
+      if (err == -2) {
+	fprintf(stderr, "%s: can't write header of final point set in the file.\n", progname);
+	exitcode = -32;
+      }
+      if (err == -3) {
+	fprintf(stderr, "%s: can't read header of final point set from the file.\n", progname);
+	exitcode = -33;
+      }
+      if (err == -4) {
+	fprintf(stderr, "%s: final point set in provided file does not match the current settings.\n", progname);
+	exitcode = -34;
+      }
+      goto exit11;
     }
     if (!rank) {
-#ifdef MPI
-      err = MPI_File_write_shared(*lp, &d.ch->n, 2, MPI_INT, MPI_STATUS_IGNORE);
-#else
-      err = fwrite(&d.ch->n, sizeof(int), 2, lp) != 2;
-#endif
-    }
-    if (err) {
-      fprintf(stderr, "%s: can't write in the file of last points.\n", progname);
-      exitcode = 121;
-      goto exit11;
+      if (err & 1) {
+	printf("warning: the final point set file is empty, although calculation was continued and %d samples have already stored\n", ndone);
+      }
+      if (err & 2) {
+	printf("warning: the origin site in the final point set file is not match the current one.\n");
+      }
+      if (err & 4) {
+	printf("warning: the number of samples stored in the final point set file is not match one in the result file.\n");
+      }
+      if (err) printf("\n");
     }
   }
 
@@ -491,8 +464,7 @@ int main(int argc, char **argv)
 
     /*               1         2         3         4         5         6         7         8
     /*      12345678901234567890123456789012345678901234567890123456789012345678901234567890 */
-    /* printf("     # ===== progress =====      t,s max|P2-1|    min(h)     P(1)     P(n)\n"); */
-    printf("     #      t,s max|P2-1|    min(h)    max(h)        Ek        Ep\n");
+    printf("       # ======= progress =======         t max|P2-1| max(s)     P(1)     P(N)\n");
     fflush(stdout);
   }
 
@@ -507,9 +479,9 @@ int main(int argc, char **argv)
     /* reset partial statistics */
     sol_setzero(si);
     /* solve quantum equation qn times */
-    if (eq(&d, d.h, tmax, qn, si, lp)) {
-      fprintf(stderr, "%s: insufficient memory\n", progname);
-      exitcode = -23;
+    if (eq(&d, d.h, tmax, qn, si)) {
+      fprintf(stderr, "%s: error in equation solution process\n", progname);
+      exitcode = -50;
       goto exit11;
     }
     i -= qn;
@@ -530,17 +502,15 @@ int main(int argc, char **argv)
     }
 #endif
     if (!rank) {
-      cblas_dscal(si->numel, ndone, ss, 1);
-      cblas_daxpy(si->numel, 1.0, si->r, 1, ss, 1);
+      a = (real_t) ndone;
       ndone += si->nsamp;
-      /*si->nsamp = ndone;*/
-      cblas_dscal(si->numel, 1.0 / ndone, ss, 1);
-
+      for (k = 0; k < si->numel; ++k)
+	ss[k] = (a * ss[k] + si->r[k]) / (real_t) ndone;
 
       f = fopen(fntmp, "wb");
       if (!f) {
 	fprintf(stderr, "%s: can't reset output file.\n", progname);
-	exitcode = -24;
+	exitcode = -35;
 	goto exit11;
       }
       exitcode = etrans_write(&d, si, ndone, ss, f);
@@ -549,7 +519,7 @@ int main(int argc, char **argv)
       fclose(f);
       if (exitcode) {
 	fprintf(stderr, "%s: can't write results.\n", progname);
-	exitcode = -25;
+	exitcode = -36;
 	goto exit11;
       }
 
@@ -561,32 +531,21 @@ int main(int argc, char **argv)
 #endif
     wtm1 = walltime();
     elapse += wtm1 - wtm0;
-    if (!rank)
+    if (!rank) {
       printf("%%%% synctime = %.2g, nsamp = %d, elapse = %.2f\n", wtm1 - wtm0, ndone, elapse);
+      fflush(stdout);
+    }
     wtm0 = wtm1;
   }
   exitcode = 0;
 
  exit11:
-  if (lp) {
-#ifdef MPI
-    MPI_File_close(lp);
-#else
-    fclose(lp);
-#endif
-  }
+  fpset_close();
  exit10:
   free(fntmp);
  exit9:
   d.s->del(d.s);
  exit8:
-  if (is) {
-#ifdef MPI
-    MPI_File_close(lp);
-#else
-    fclose(lp);
-#endif    
-  }
  exit7:
   if (!rank)
     free(ss);

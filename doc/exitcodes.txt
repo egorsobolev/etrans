@@ -1,0 +1,37 @@
+-1	argtable allocation error
+-2	command line options parsing error
+-3	log file opening error
+-4	random generator initialization error
+-5	sequence file opening error
+-6	sequence file reading/parsing/allocation error
+-7	output/restart file opening error
+-8	header of output/restart file reading error
+-9	output sheme file opening error
+-10	output sheme reading error
+-11	chain allocation error
+-12	chain initialization error
+-13	chain reading error
+-14	quantum parmeters file opening error
+-15	quantum parmeters reading error
+-16	invalid value of origin option
+-17	charge allocation error
+-18	charge sequence setting error
+-19	charge initialization error
+-20	charge reading error
+-21	nsamp reading error
+-22	output sheme reading error from output/restart file
+-23	output functionals allocation error
+-24	summation buffer allocation error
+-25	output functionals reading error
+-26	initial state initialization/reading/allocation error
+-27	invalid value of initial state type option
+-28	invalid value of initial state file option
+-29	initial state file opening error
+-30	tmpfn allocation error
+-31	final point set file opening error
+-32	final point set writing error
+-33	final point set reading error
+-34	wrong file of final point set
+-35	restart/output file reset error
+-36	restart/output file writing error
+-50	equation error 

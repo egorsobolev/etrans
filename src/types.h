@@ -11,6 +11,8 @@ typedef float real_t;
 # define _sin(X) sinf(X)
 # define _cos(X) cosf(X)
 # define _fabs(X) fabsf(X)
+# define _log(X) logf(X)
+# define _exp(X) expf(X)
 # define cblas_copy cblas_scopy
 # define cblas_scal cblas_sscal
 # define cblas_dot cblas_sdot
@@ -27,6 +29,8 @@ typedef double real_t;
 # define _sin(X) sin(X)
 # define _cos(X) cos(X)
 # define _fabs(X) fabs(X)
+# define _log(X) log(X)
+# define _exp(X) exp(X)
 # define cblas_copy cblas_dcopy
 # define cblas_scal cblas_dscal
 # define cblas_dot cblas_ddot
@@ -35,12 +39,6 @@ typedef double real_t;
 # define clapack_lamch clapack_dlamch
 # define clapack_stevx clapack_dstevx
 # define thomas1 thomas1d
-#endif
-
-#ifdef MPI
-#define SFILE MPI_File
-#else
-#define SFILE FILE
 #endif
 
 #endif /* __ETRANS_TYPES_H */

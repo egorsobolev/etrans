@@ -5,12 +5,6 @@
 #include <math.h>
 #include <string.h>
 
-#ifdef USE_MKL
-# include <mkl.h>
-#else
-# include <gsl/gsl_cblas.h>
-#endif
-
 void initial_del(initial_t *state)
 {
   free(state);
@@ -60,10 +54,12 @@ initial_1site_t *mk_initial_1site(int n0)
 int state_set(initial_t *state, int n, int n0, real_t *x)
 {
   initial_1state_t *s = (initial_1state_t *) state;
-  int nn = 2 * n;
+  int k, nn = 2 * n;
 
-  cblas_axpy(nn, 1.0, s->x0 + nn, 1, x + nn, 1);
-  cblas_copy(nn, s->x0, 1, x, 1);
+  for (k = 0; k < nn; ++k) {
+    x[k] = s->x0[k];
+    x[k+nn] += s->x0[k+nn];
+  }
 
   return 0;
 }
@@ -137,20 +133,28 @@ initial_1state_t *mk_initial_1state(FILE *f, int n, int n0)
 int set_set(initial_t *state, int n, int n0, real_t *x)
 {
   initial_set_t *s = (initial_set_t *) state;
+  int k, err, m;
 #ifdef MPI
-  if (MPI_File_read_shared(*s->f, s->x0, 4 * s->n, MPI_ET_REAL, MPI_STATUS_IGNORE))
+  MPI_Status status;
+  err = MPI_File_read_shared(s->fh, s->x0, 4 * s->n, MPI_ET_REAL, &status);
+  if (err != MPI_SUCCESS)
+    return -1;
+  err = MPI_Get_count(&status, MPI_ET_REAL, &m);
+  if (err != MPI_SUCCESS || m != (4 * s->n))
     return -1;
 #else
-  if (fread(s->x0, sizeof(real_t), 4 * s->n, s->f) != (4 * s->n))
+  m = fread(s->x0, sizeof(real_t), 4 * s->n, s->fh);
+  if (m != (4 * s->n))
     return -1;
 #endif
   memset(x, 0, 2 * n * sizeof(real_t));
 
-  cblas_copy(s->l, s->x0+s->sl, 1, x+s->os, 1);
-  cblas_copy(s->l, s->x0+s->n+s->sl, 1, x+n+s->os, 1);
-
-  cblas_copy(s->l, s->x0+2*s->n+s->sl, 1, x+2*n+s->os, 1);
-  cblas_copy(s->l, s->x0+3*s->n+s->sl, 1, x+3*n+s->os, 1);
+  for (k = 0; k < s->l; ++k) {
+    x[s->os+k] = s->x0[s->sl+k];
+    x[n+s->os+k] = s->x0[s->n+s->sl+k];
+    x[2*n+s->os+k] = s->x0[2*s->n+s->sl+k];
+    x[3*n+s->os+k] = s->x0[3*s->n+s->sl+k];
+  }
 
   return 0;
 }
@@ -166,20 +170,41 @@ size_t set_nbytes(initial_t *state)
   return set_nbytes_impl(s->n);
 }
 
-initial_set_t *mk_initial_set(SFILE *f, int from, int n, int n0)
+void initial_set_del(initial_t *state)
+{
+  initial_set_t *s = (initial_set_t *) state;
+#ifdef MPI
+  MPI_File_close(&s->fh);
+#else
+  fclose(s->fh);
+#endif
+  free(state);
+}
+
+initial_set_t *mk_initial_set(const char *fn, int from, int n, int n0)
 {
   initial_set_t *s;
   int b[2], os, sr, l;
 
 #ifdef MPI
-  if (MPI_File_read_at_all(*f, 0, b, 2, MPI_ET_REAL, MPI_STATUS_IGNORE))
+  MPI_Status status;
+  MPI_File fh;
+  if (MPI_File_open(MPI_COMM_WORLD, fn, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh) != MPI_SUCCESS)
     return NULL;
-  if (MPI_File_seek_shared(*f, 2 * sizeof(int) + 4 * b[0] * from, MPI_SEEK_SET))
+  if (MPI_File_read_at_all(fh, 0, b, 2, MPI_INT, &status) != MPI_SUCCESS)
+    return NULL;
+  if (MPI_Get_count(&status, MPI_INT, &l) != MPI_SUCCESS || l != 2)
+    return NULL;
+  if (MPI_File_seek_shared(fh, 2 * sizeof(int) + 4 * b[0] * from, MPI_SEEK_SET) != MPI_SUCCESS)
     return NULL;
 #else
-  if (fread(&b, sizeof(int), 2, f) != 2)
+  FILE *fh;
+  fh = fopen(fn, "r");
+  if (!fh)
     return NULL;
-  if (fseek(f, 4 * b[0] * from, SEEK_CUR))
+  if (fread(&b, sizeof(int), 2, fh) != 2)
+    return NULL;
+  if (fseek(fh, 4 * b[0] * from, SEEK_CUR))
     return NULL;
 #endif
 
@@ -189,10 +214,14 @@ initial_set_t *mk_initial_set(SFILE *f, int from, int n, int n0)
   s->x0 = (real_t *) (s + 1);
 
   s->set = &set_set;
-  s->del = &initial_del;
+  s->del = &initial_set_del;
   s->nbytes = &set_nbytes;
 
-  s->f = f;
+#ifdef MPI
+  memcpy(&s->fh, &fh, sizeof(MPI_File));
+#else
+  s->fh = fh;
+#endif
 
   os = n0 - b[1];
   l = n - b[0];
