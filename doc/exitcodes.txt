@@ -31,7 +31,9 @@
 -31	final point set file opening error
 -32	final point set writing error
 -33	final point set reading error
--34	wrong file of final point set
--35	restart/output file reset error
--36	restart/output file writing error
+-34	wrong number of sites in file of final point set
+-35	final point set file too short
+-36	repostion of final point set file error
+-37	restart/output file reset error
+-38	restart/output file writing error
 -50	equation error 

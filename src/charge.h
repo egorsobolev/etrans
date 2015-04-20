@@ -32,7 +32,7 @@ void charge_del(charge_eq_t *eq);
 int charge_write(const charge_eq_t *eq, FILE *f);
 int charge_read(charge_eq_t *eq, FILE *f);
 
-void expmv(int n, real_t *bi, real_t* cr, real_t *ci, real_t *sr, real_t *si, real_t *wrk, real_t *er, real_t *ei, int *scl);
+void expmv(int n, real_t *bi, real_t* cr, real_t *ci, real_t *sr, real_t *si, real_t *wrk, real_t *er, real_t *ei);
 
 
 #endif /* __ETRAMS_CHARGE_H */

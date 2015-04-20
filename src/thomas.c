@@ -4,8 +4,8 @@
 /*
   input:
   n - matrix size, int(1)
-  br - real part of diagonal, real(1)
-  bi - imaginary part of diagonal, real(n)
+  br - real part of diagonal, real(n)
+  bi - imaginary part of diagonal, real(1)
   cr - real part of superdiagonal, real(n-1)
   ci - imaginary part of superdiagonal, real(n-1)
   dr - real part of right hand vector, real(n)
@@ -21,7 +21,7 @@
   note:
   dr,di - are destroyed
 */
-void thomas(int n, real_t br, real_t *bi, real_t* cr, real_t *ci, real_t *dr, real_t *di, real_t *xr, real_t *xi)
+void thomas(int n, real_t *br, real_t bi, real_t* cr, real_t *ci, real_t *dr, real_t *di, real_t *xr, real_t *xi)
 {
   int k, k1, n1;
   real_t b2, mr, mi, yr, yi;
@@ -32,20 +32,20 @@ void thomas(int n, real_t br, real_t *bi, real_t* cr, real_t *ci, real_t *dr, re
     xr[k] = dr[k];
     xi[k] = di[k];
   }
-  b2 = br*br + bi[0] * bi[0];
-  dr[0] = br / b2;
-  di[0] = bi[0] / b2;
+  b2 = br[0]*br[0] + bi * bi;
+  dr[0] = br[0] / b2;
+  di[0] = bi / b2;
   for (k = 1; k < n; ++k) {
     k1 = k - 1;
     /* m = a(k-1) / b(k-1) */
-    mr = -cr[k1]*dr[k1] + ci[k1]*di[k1];
-    mi =  ci[k1]*dr[k1] + cr[k1]*di[k1];
+    mr =  cr[k1]*dr[k1] - ci[k1]*di[k1];
+    mi = -ci[k1]*dr[k1] - cr[k1]*di[k1];
     /* d(k) = d(k) - m * d(k-1) */
     xr[k] = dr[k] - mr*xr[k1] + mi*xi[k1];
     xi[k] = di[k] - mi*xr[k1] - mr*xi[k1];
     /* b(k) = b(k) - m * c(k-1); */
-    yr = br - mr*cr[k1] + mi*ci[k1];
-    yi = bi[k] - mi*cr[k1] - mr*ci[k1];
+    yr = br[k] - mr*cr[k1] + mi*ci[k1];
+    yi = bi - mi*cr[k1] - mr*ci[k1];
     b2 = yr*yr + yi*yi;
     dr[k] = yr / b2;
     di[k] = yi / b2;

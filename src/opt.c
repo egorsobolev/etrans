@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NOPTION 29
+#define NOPTION 30
 
 void **argtable_mk(etrans_opt_t *o)
 {
@@ -15,6 +15,7 @@ void **argtable_mk(etrans_opt_t *o)
 
   t[i++] = o->mdl = arg_str0("C", NULL, NULL, "chain model: OSC, PBD (OSC)");
   t[i++] = o->seqfn = arg_file0("s", NULL, NULL, "chain sequence file");
+  t[i++] = o->mg4 = arg_lit0("4", NULL, "4th order of matrix integral");
   t[i++] = o->n0 = arg_int0("0", NULL, NULL, "number of site that is used as the origin ((n-1)/2+1)");
   t[i++] = o->outsh = arg_file0("O", NULL, NULL, "output sheme file");
   t[i++] = o->logfn = arg_file0("l", NULL, NULL, "log file");

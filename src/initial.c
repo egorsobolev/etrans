@@ -195,7 +195,7 @@ initial_set_t *mk_initial_set(const char *fn, int from, int n, int n0)
     return NULL;
   if (MPI_Get_count(&status, MPI_INT, &l) != MPI_SUCCESS || l != 2)
     return NULL;
-  if (MPI_File_seek_shared(fh, 2 * sizeof(int) + 4 * b[0] * from, MPI_SEEK_SET) != MPI_SUCCESS)
+  if (MPI_File_seek_shared(fh, 2 * sizeof(int) + 4 * b[0] * from * sizeof(real_t), MPI_SEEK_SET) != MPI_SUCCESS)
     return NULL;
 #else
   FILE *fh;

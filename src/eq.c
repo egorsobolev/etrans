@@ -33,10 +33,10 @@ size_t eq_nbytes(int n)
 char timeunit[] = {'s', 'm', 'h'};
 
 
-int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
+int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, int mg, sol_t *res)
 {
-  int nstep, nskip, n, n1, nn, i, j, ln, k, m, q, qn, l, s, mx;
-  real_t a, p2, normp, nr, sqrth;
+  int nstep, nskip, n, n1, nn, i, j, ln, k, m, q, qn, l;
+  real_t a, p2, normp, nr, sqrth, normA;
   real_t *u, *v, *b2l, *b2r, *b2t;
   real_t *dsr, *d2sr, *x3, *x2, *x1, *xt, *u3, *u2, *u1, *ut, *g1, *g2;
   real_t *di, *cr, *ci;
@@ -107,7 +107,7 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
     j = d->nskip - 1;
     ln = 0;
     l = 0;
-    mx = 1;
+    normA = 0.0;
 
     /* cycle by classical steps */
     i = 0;
@@ -132,7 +132,7 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
       for (k = 0; k < n; ++k)
 	u3[k] += 0.5 * h * g1[k+n];
 
-      if (i) {
+      if (mg && i) {
 	/* Magnus 2nd order */
 	/* S Blanes et al./ Physics Reports 470 (2009) 151-238 */
 	/* h * (A1 + 4A2 + A3) / 6 - h^2 [A1, A3] / 12 */
@@ -161,10 +161,10 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
 	 G Gallopoulos and Y Saad, SIAM Journal on Scientific and Statistical Computing 13 (1992) 1236-1264
 
 	 NB: Here dsr(2n) and d2sr(2n) are used as workspace and destroyed */
-      expmv(n, di, cr, ci, x1, x1+n, dsr, x3, x3+n, &s);
+      expmv(n, di, cr, ci, x1, x1+n, dsr, x3, x3+n);
 
-      if (s > mx)
-	mx = s;
+      if (*dsr > normA)
+	normA = *dsr;
 
       /* calculate I1 = sum(b(k)^2) and move b(k) back to the trajectory */
       p2 = 0.0;
@@ -203,7 +203,7 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
       }
 
       if (!rank) {
-	progress = (int) (24.0 * (1.0 + i - j / (double) d->nskip) / (double) nstep + 0.5);
+	progress = (int) (22.0 * (1.0 + i - j / (double) d->nskip) / (double) nstep + 0.5);
 	while (l < progress) {
 	  printf(".");
 	  fflush(stdout);
@@ -230,7 +230,7 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res)
     /*                12345678901234567890123456789012345678901234567890123456789012345678901234567890 */
     /* printf("     # ===== progress =====      t,s max|P2-1|    min(h)     P(1)     P(n)\n"); */
     if (!rank) {
-      printf(" %8.3g%c%10.2g%7d%9.1e%9.1e\n", dwtm, timeunit[tu], (double) nr, mx, (double) b2l[0], (double) b2l[n-1]);
+      printf(" %8.3g%c%10.2g%9.2g%9.1e%9.1e\n", dwtm, timeunit[tu], (double) nr, (double) normA, (double) b2l[0], (double) b2l[n-1]);
       fflush(stdout);
     }
     elapse += (wtm1 - wtm0);

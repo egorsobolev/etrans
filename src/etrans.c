@@ -33,7 +33,7 @@
 #include "opt.h"
 
 
-int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, sol_t *res);
+int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, int mg, sol_t *res);
 
 int eq_read_head(eqdata_t *d, FILE *f)
 {
@@ -432,22 +432,18 @@ int main(int argc, char **argv)
 	exitcode = -33;
       }
       if (err == -4) {
-	fprintf(stderr, "%s: final point set in provided file does not match the current settings.\n", progname);
+	fprintf(stderr, "%s: number of sites in final point set file does not match the current settings.\n", progname);
 	exitcode = -34;
       }
+      if (err == -5) {
+	fprintf(stderr, "%s: final point set file too short.\n", progname);
+	exitcode = -35;
+      }
+      if (err == -6) {
+	fprintf(stderr, "%s: can't set position in final point set file.\n", progname);
+	exitcode = -36;
+      }
       goto exit11;
-    }
-    if (!rank) {
-      if (err & 1) {
-	printf("warning: the final point set file is empty, although calculation was continued and %d samples have already stored\n", ndone);
-      }
-      if (err & 2) {
-	printf("warning: the origin site in the final point set file is not match the current one.\n");
-      }
-      if (err & 4) {
-	printf("warning: the number of samples stored in the final point set file is not match one in the result file.\n");
-      }
-      if (err) printf("\n");
     }
   }
 
@@ -460,11 +456,13 @@ int main(int argc, char **argv)
     printf("Used memory on slave:  %12ld\n", nb);
     printf("Used memory on master: %12ld\n\n", nb + si->numel * sizeof(double));
 
+    printf("Magnus order: %d\n\n", opt.mg4->count > 0 ? 4 : 2);
+
     printf("Nsamp: %d/%d\n\n", ndone, ndone + np * nsamp);
 
     /*               1         2         3         4         5         6         7         8
     /*      12345678901234567890123456789012345678901234567890123456789012345678901234567890 */
-    printf("       # ======= progress =======         t max|P2-1| max(s)     P(1)     P(N)\n");
+    printf("       # ====== progress ======         t max|P2-1| max||A||     P(1)     P(N)\n");
     fflush(stdout);
   }
 
@@ -479,7 +477,7 @@ int main(int argc, char **argv)
     /* reset partial statistics */
     sol_setzero(si);
     /* solve quantum equation qn times */
-    if (eq(&d, d.h, tmax, qn, si)) {
+    if (eq(&d, d.h, tmax, qn, opt.mg4->count > 0, si)) {
       fprintf(stderr, "%s: error in equation solution process\n", progname);
       exitcode = -50;
       goto exit11;
@@ -510,7 +508,7 @@ int main(int argc, char **argv)
       f = fopen(fntmp, "wb");
       if (!f) {
 	fprintf(stderr, "%s: can't reset output file.\n", progname);
-	exitcode = -35;
+	exitcode = -37;
 	goto exit11;
       }
       exitcode = etrans_write(&d, si, ndone, ss, f);
@@ -519,7 +517,7 @@ int main(int argc, char **argv)
       fclose(f);
       if (exitcode) {
 	fprintf(stderr, "%s: can't write results.\n", progname);
-	exitcode = -36;
+	exitcode = -38;
 	goto exit11;
       }
 

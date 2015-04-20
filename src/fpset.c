@@ -41,7 +41,7 @@ int fpset_open(const char *fn, int n, int n0, int nsamp)
   if (MPI_File_get_size(fh, &fsz) != MPI_SUCCESS)
     return -1;
 
-  if (fsz == 0) {
+  if (!fsz && !nsamp) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (!rank) {
       m[0] = n;
@@ -52,22 +52,25 @@ int fpset_open(const char *fn, int n, int n0, int nsamp)
 	return -2;
     }
     enable = 1;
-    return nsamp != 0;
+    return 0;
   }
   if (MPI_File_read_at_all(fh, 0, m, 2, MPI_INT, &status) != MPI_SUCCESS)
     return -3;
   if (MPI_Get_count(&status, MPI_INT, &numel) != MPI_SUCCESS || numel != 2)
     return -3;
 
-  esz = 4 * n * sizeof(real_t);
-  if (m[0] != n || ((fsz - 2 * sizeof(int)) % esz))
+  if (m[0] != n)
     return -4;
-  if (MPI_File_seek_shared(fh, 0, MPI_SEEK_END) != MPI_SUCCESS)
+
+  esz = 4 * n * nsamp * sizeof(real_t) + 2 * sizeof(int);
+  if (fsz < esz)
     return -5;
 
-  esz = nsamp * esz + 2 * sizeof(int);
+  if (MPI_File_seek_shared(fh, esz, MPI_SEEK_SET) != MPI_SUCCESS)
+    return -6;
+
   enable = 1;
-  return ((m[1] != n0) << 1) | ((esz != fsz) << 2);
+  return 0;
 }
 
 int fpset_write(int n, real_t *x)
@@ -121,26 +124,34 @@ int fpset_open(const char *fn, int n, int n0, int nsamp)
     return -1;
 
   fsz = fread(m, sizeof(int), 2, fh);
-  if (fsz == 0) {
+  if (!fsz && !nsamp) {
     m[0] = n; m[1] = n0;
     if (fwrite(m, sizeof(int), 2, fh) != 2)
       return -2;
     enable = 1;
-    return nsamp != 0;
+    return 0;
   }
   if (fsz != 2)
     return -3;
 
-  fseek(fh, 0, SEEK_END);
-  fsz = ftell(fh);
-
-  esz = 4 * n * sizeof(real_t);
-  if (m[0] != n || ((fsz - 2 * sizeof(int)) % esz))
+  if (m[0] != n)
     return -4;
 
-  esz = nsamp * esz + 2 * sizeof(int);
+  if (!fseek(fh, 0, SEEK_END))
+    return -6;
+  fsz = ftell(fh);
+  if (fsz < 0)
+    return -6;
+
+  esz = 4 * n * nsamp * sizeof(real_t) + 2 * sizeof(int);
+  if (fsz < esz)
+    return -5;
+
+  if (!fseek(fh, esz, SEEK_SET))
+    return -6;
+
   enable = 1;
-  return ((m[1] != n0) << 1) | ((esz != fsz) << 2);
+  return 0;
 }
 
 int fpset_write(int n, real_t *x)

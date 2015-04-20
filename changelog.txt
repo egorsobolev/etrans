@@ -1,3 +1,10 @@
+2015-04-20 Egor Sobolev <egor@impb.psn.ru>
+ * fixed calculation of first initial point offset when restart from control point (-y S -c)
+ * fixed position in final point set file when restart from control point (-w <file> -c)
+ * changed matrix exponential approximation, shifting and scaling
+ * added rational approximation of small degree for matrix with small norm
+ * added option to enable 4th order Magnus (-4)
+
 2015-04-15 Egor Sobolev <egor@impb.psn.ru>
  * added functionals x = sum(n * |b(n)|^2, n=1...N), dx = sum(n * d|b(n)|^2, n=1...N)
  * improved trajectory log records
