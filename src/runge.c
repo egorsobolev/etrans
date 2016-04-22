@@ -1,7 +1,7 @@
 #include "types.h"
 #include "chain.h"
-#include "rnd.h"
 
+#include <rng.h>
 #include <math.h>
 
 /* 2o2s1g algorithm */
@@ -22,7 +22,7 @@ void rk_2o2s1g(chain_eq_t *c, real_t *wrk, real_t h, real_t *x)
   for (k = 0; k < nn; k++) {
     x0[k] = x[k];
   }
-  rnd_gaussian(n, x + n, 1.0);
+  rng_gaussian(n, x + n, 1.0);
   for (k = n; k < nn; ++k) {
     x[k] = sqrth * x[k] + x0[k];
     g1[k-n] = x[k]; /* du = v */

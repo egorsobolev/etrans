@@ -22,6 +22,10 @@ struct INITIAL_STATE
   initial_nbytes_f *nbytes;
 };
 
+typedef struct INITIAL_STATE initial_uniform_t;
+initial_uniform_t *mk_initial_uniform();
+
+
 struct INITIAL_1SITE
 {
   initial_set_f *set;

@@ -16,6 +16,9 @@ struct EQDATA
   real_t h;
   int nskip;
 
+  real_t ntm;
+  real_t nthr;
+
   charge_eq_t *ch;
   chain_eq_t *chain;
   charge_parm_t *charge_parm;

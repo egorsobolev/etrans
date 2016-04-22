@@ -4,19 +4,10 @@ CC=gcc
 #CFLAGS= -O3
 
 # gcc
-CFLAGS= -O3 -funroll-all-loops -ffast-math -fno-trapping-math
-
-# MATHLIB
-# GSL
-#MATHCFLAGS=
-#MATHLFLAGS= -lgsl -lgslcblas
-
-# MKL
-MKLROOT=/opt/intel/mkl
-MATHCFLAGS= -I$(MKLROOT)/include -DUSE_MKL
-MATHLFLAGS= -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a \
-    $(MKLROOT)/lib/intel64/libmkl_sequential.a \
-    $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -limf
+# in GCC 4.9.2 -ftree-loop-vectorize leads to segmentation fault in sol_update (sol.c)
+# -freee-loop-vectorize is enabled by -03, so use -O2
+# this has no matter on caclulation speed
+CFLAGS= -O2 -funroll-all-loops -ffast-math -fno-trapping-math
 
 # IMPB openmpi
 MPICFLAG = -I/usr/lib/openmpi/include -DMPI
@@ -45,25 +36,23 @@ OBJSRL = $(addprefix .o.serial/,$(SRC:.c=.o))
 
 all:	serial mpi
 
-serial:	argtable $(OBJSRL)
-	$(CC) -o ../bin/etrans $(OBJSRL) ../argtable2-13/lib/libargtable2.a \
-            $(MATHLFLAGS) -lm
+serial:	argtable librng $(OBJSRL)
+	$(CC) -o ../bin/etrans $(OBJSRL) -lm \
+	    ../argtable2-13/lib/libargtable2.a ../rng1-0/librng.a
 
-mpi:	argtable $(OBJMPI)
-	$(CC) -o ../bin/etrans.MPI $(OBJMPI) ../argtable2-13/lib/libargtable2.a $(MPILFLAG) \
-	    $(MATHLFLAGS) -lm
+mpi:	argtable librng $(OBJMPI)
+	$(CC) -o ../bin/etrans.MPI $(OBJMPI) $(MPILFLAG) -lm \
+            ../argtable2-13/lib/libargtable2.a ../rng1-0/librng.a
 
 .o.mpi/%.o:	%.c
-	$(CC) -DUSE_STDARG -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_UNISTD_H=1 \
-	    -DHAVE_STDARG_H=1 -DUSE_STDARG=1 -DMALLOC_RET_VOID=1 -c \
-	    -I/usr/include/x86_64-linux-gnu $(CFLAGS) $(MPICFLAG) \
-	    -I../argtable2-13/include $(MATHCFLAGS) -o $@ $<
+	$(CC) -I/usr/include/x86_64-linux-gnu $(CFLAGS) $(MPICFLAG) \
+	    -I../argtable2-13/include -I../rng1-0 \
+	    -c -o $@ $<
 
 .o.serial/%.o:	%.c
-	$(CC) -DUSE_STDARG -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_UNISTD_H=1 \
-	    -DHAVE_STDARG_H=1 -DUSE_STDARG=1 -DMALLOC_RET_VOID=1 -c \
-	    -I/usr/include/x86_64-linux-gnu ${CFLAGS} \
-	    -I../argtable2-13/include $(MATHCFLAGS) -o $@ $<
+	$(CC) -I/usr/include/x86_64-linux-gnu ${CFLAGS} \
+	    -I../argtable2-13/include -I../rng1-0 \
+	    -c -o $@ $<
 
 $(OBJMPI):	| .o.mpi
 
@@ -94,9 +83,21 @@ argtable:	| ../argtable2-13
 	    cd src; \
 	)
 
+librng:		| ../rng1-0
+
+../rng1-0:
+	( \
+	    cd ..; \
+	    tar -xzf rng1-0.tar.gz; \
+	    cd rng1-0; \
+            make; \
+	    cd ../src; \
+	)
+
 .PHONY:	clean
 clean:
 	-rm -r ../argtable2-13
+	-rm -r ../rng1-0
 	-rm -r $(OBJMPI) $(OBJSRL) ../bin/etrans ../bin/etrans.MPI
 	-rmdir .o.mpi .o.serial
 

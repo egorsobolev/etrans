@@ -19,7 +19,7 @@ struct FUCTIONAL
 };
 typedef struct FUCTIONAL int_func_t;
 
-#define MAX_FUNC (15)
+#define MAX_FUNC (17)
 int_func_t int_func[MAX_FUNC];
 
 #define ET_MEAN (0x1)

@@ -4,7 +4,6 @@
 #include "config.h"
 #include "types.h"
 #include "chain.h"
-#include "rnd.h"
 #include "charge.h"
 
 charge_parm_t pbd_charge_defs;

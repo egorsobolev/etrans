@@ -7,9 +7,10 @@
 struct ETRANS_OPTIONS
 {
   struct arg_file *seqfn, *logfn, *initfn, *prmfn, *outfn, *outsh, *lpfn;
-  struct arg_lit *rst, *help, *ver, *mg4;
-  struct arg_int *nsamp, *n0, *no;
+  struct arg_lit *rst, *help, *ver; /*, *mg4;*/
+  struct arg_int *nsamp, *n0, *no, *mg;
   struct arg_dbl *tmax, *h, *temp, *gamma, *omegaM2, *chi, *mu, *omegaB2, *drp, *sigma, *rho, *epsilon, *lambda;
+  struct arg_dbl *ntm, *nthr;
   struct arg_str *mdl, *init;
   struct arg_end *end;
 };

@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NOPTION 30
+#define NOPTION 32
 
 void **argtable_mk(etrans_opt_t *o)
 {
@@ -15,11 +15,12 @@ void **argtable_mk(etrans_opt_t *o)
 
   t[i++] = o->mdl = arg_str0("C", NULL, NULL, "chain model: OSC, PBD (OSC)");
   t[i++] = o->seqfn = arg_file0("s", NULL, NULL, "chain sequence file");
-  t[i++] = o->mg4 = arg_lit0("4", NULL, "4th order of matrix integral");
+  /*  t[i++] = o->mg4 = arg_lit0("4", NULL, "4th order of matrix integral");*/
+  t[i++] = o->mg = arg_int0("g", NULL, NULL, "order of matrix integral: 1,2,4 (2)");
   t[i++] = o->n0 = arg_int0("0", NULL, NULL, "number of site that is used as the origin ((n-1)/2+1)");
   t[i++] = o->outsh = arg_file0("O", NULL, NULL, "output sheme file");
   t[i++] = o->logfn = arg_file0("l", NULL, NULL, "log file");
-  t[i++] = o->init = arg_str0("y", NULL, NULL, "initial state type: 1, P, S (1)");
+  t[i++] = o->init = arg_str0("y", NULL, NULL, "initial state type: 1, U, P, S (1)");
   t[i++] = o->initfn = arg_file0("I", NULL, NULL, "initial state file");
   t[i++] = o->lpfn = arg_file0("w", NULL, NULL, "file of final point set"); 
   t[i++] = o->rst = arg_lit0("c", NULL, "continue from control point");
@@ -27,6 +28,8 @@ void **argtable_mk(etrans_opt_t *o)
   t[i++] = o->tmax = arg_dbl0("t", NULL, NULL, "trajectory time (600)");
   t[i++] = o->h = arg_dbl0("h", NULL, NULL, "time step (0.2)");
   t[i++] = o->no = arg_int0("Q", NULL, NULL, "output step (1)");
+  t[i++] = o->nthr = arg_dbl0("H", NULL, NULL, "Norm correction threshold (inf)");
+  t[i++] = o->ntm =  arg_dbl0("n", NULL, NULL, "Time interval for norm correction (inf)");
   t[i++] = o->temp = arg_dbl0("T", NULL, NULL, "T - temperature, K (300)");
   t[i++] = o->gamma = arg_dbl0("F", NULL, NULL, "gamma - friction (6.0e-3)");
   t[i++] = o->omegaM2 = arg_dbl0("E", NULL, NULL, "omega0^2 - elastic (1.0e-4)");
@@ -70,6 +73,9 @@ void **argtable_mk(etrans_opt_t *o)
   o->drp->dval[0] = 20.0;
   o->mdl->sval[0] = "OSC";
   o->init->sval[0] = "1";
+  o->ntm->dval[0] = 1.0 / 0.0;
+  o->nthr->dval[0] = 1.0 / 0.0;
+  o->mg->ival[0] = 2;
 
   return t;
 }

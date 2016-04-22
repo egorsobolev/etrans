@@ -14,6 +14,7 @@ typedef float real_t;
 # define _log(X) logf(X)
 # define _exp(X) expf(X)
 # define _ceil(X) ceilf(X)
+# define _fmod(X) fmodf(X)
 # define cblas_copy cblas_scopy
 # define cblas_scal cblas_sscal
 # define cblas_dot cblas_sdot
@@ -22,6 +23,9 @@ typedef float real_t;
 # define clapack_lamch clapack_slamch
 # define clapack_stevx clapack_sstevx
 # define thomas1 thomas1s
+
+# define rng_gaussian rng_gaussian_s
+# define rng_uniform rng_uniform_s
 #else
 typedef double real_t;
 # define MPI_ET_REAL MPI_DOUBLE
@@ -33,6 +37,7 @@ typedef double real_t;
 # define _log(X) log(X)
 # define _exp(X) exp(X)
 # define _ceil(X) ceil(X)
+# define _fmod(X) fmodf(X)
 # define cblas_copy cblas_dcopy
 # define cblas_scal cblas_dscal
 # define cblas_dot cblas_ddot
@@ -41,6 +46,9 @@ typedef double real_t;
 # define clapack_lamch clapack_dlamch
 # define clapack_stevx clapack_dstevx
 # define thomas1 thomas1d
+
+# define rng_gaussian rng_gaussian_d
+# define rng_uniform rng_uniform_d
 #endif
 
 #endif /* __ETRANS_TYPES_H */

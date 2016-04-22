@@ -2,7 +2,8 @@
 #include "etrans.h"
 #include "osc.h"
 #include "sol.h"
-#include "rnd.h"
+
+#include <rng.h>
 
 #include <memory.h>
 #include <malloc.h>
@@ -35,8 +36,8 @@ char timeunit[] = {'s', 'm', 'h'};
 
 int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, int mg, sol_t *res)
 {
-  int nstep, nskip, n, n1, nn, i, j, ln, k, m, q, qn, l;
-  real_t a, p2, normp, nr, sqrth, normA;
+  int nstep, n, n1, nn, i, j, ln, k, q, qn, l;
+  real_t a, p2, normp, nr, sqrth, normA, t;
   real_t *u, *v, *b2l, *b2r, *b2t;
   real_t *dsr, *d2sr, *x3, *x2, *x1, *xt, *u3, *u2, *u1, *ut, *g1, *g2;
   real_t *di, *cr, *ci;
@@ -108,6 +109,7 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, int mg, sol_t *res)
     ln = 0;
     l = 0;
     normA = 0.0;
+    t = d->ntm;
 
     /* cycle by classical steps */
     i = 0;
@@ -117,7 +119,7 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, int mg, sol_t *res)
 
       /* 2o2s1g algorithm */
       /* HS Greenside and E Helfand, The Bell System Technical Journal 60 (1981) 1927-1940 */
-      rnd_gaussian(n, u3 + n, 1.0);
+      rng_gaussian(n, u3 + n, 1.0);
       for (k = 0; k < n; ++k) {
 	u3[k] = u2[k];
 	u3[k+n] = sqrth * u3[k+n] + u2[k+n];
@@ -132,8 +134,8 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, int mg, sol_t *res)
       for (k = 0; k < n; ++k)
 	u3[k] += 0.5 * h * g1[k+n];
 
-      if (mg && i) {
-	/* Magnus 2nd order */
+      if (mg == 2 && i) {
+	/* Magnus 4rd order */
 	/* S Blanes et al./ Physics Reports 470 (2009) 151-238 */
 	/* h * (A1 + 4A2 + A3) / 6 - h^2 [A1, A3] / 12 */
 	for (k = 0; k < n; ++k) {
@@ -143,12 +145,24 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, int mg, sol_t *res)
 	  ci[k] = 2 * h * d->ch->s[k];
 	  cr[k] = h * h * d->ch->s[k] * d->ch->chi * ((u1[k] - u3[k]) - (u1[k+1] - u3[k+1])) / 3;
 	}
-      } else {
-	/* Magnus 1st order */
+      } else if (mg == 1 || (mg == 2 && ~i)) {
+	/* Magnus 2nd order */
 	/* S Blanes et al./ Physics Reports 470 (2009) 151-238 */
 	/* h * (A1 + A2) / 2 */
 	for (k = 0; k < n; ++k) {
 	  di[k] = h * (d->ch->d[k] + 0.5 * d->ch->chi * (u2[k] + u3[k]));
+	}
+	for (k = 0; k < n1; ++k) {
+	  ci[k] = h * d->ch->s[k];
+	  cr[k] = 0.0;
+	}
+	for (k = 0; k < nn; ++k)
+	  x1[k] = x2[k];
+      } else {
+        /* 1st order sheme */
+        /* guess next u by current point */
+	for (k = 0; k < n; ++k) {
+	  di[k] = h * (d->ch->d[k] + d->ch->chi * (u2[k] + 0.5 * h * u2[k+n]));
 	}
 	for (k = 0; k < n1; ++k) {
 	  ci[k] = h * d->ch->s[k];
@@ -178,10 +192,14 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, int mg, sol_t *res)
 	nr = normp;
       a = _sqrt(p2);
 
-      for (k = 0; k < n; ++k) {
-	x3[k] /= a;
-	x3[k+n] /= a;
-	b2r[k] /= p2;
+      if (normp > d->nthr || t <= 0.0) {
+	for (k = 0; k < n; ++k) {
+	  x3[k] /= a;
+	  x3[k+n] /= a;
+	  b2r[k] /= p2;
+	}
+	if (t <= 0.0)
+	  t = d->ntm;
       }
       /* 2o2s1g algorithm continue 
 	 HS Greenside and E Helfand, The Bell System Technical Journal 60 (1981) 1927-1940 
@@ -213,12 +231,12 @@ int eq(eqdata_t *d, real_t h, real_t tmax, int nsamp, int mg, sol_t *res)
 
       --j;
       --ln;
+      t -= h;
     }
     if (fpset_write(4*n, x3)) {
       free(di);
       return -2;
     }
-
     wtm1 = walltime();
     dwtm = wtm1 - wtm0;
     tu = 0;

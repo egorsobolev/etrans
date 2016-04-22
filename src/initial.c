@@ -1,5 +1,6 @@
 #include "initial.h"
-#include "rnd.h"
+
+#include <rng.h>
 
 #include <stdlib.h>
 #include <math.h>
@@ -8,6 +9,48 @@
 void initial_del(initial_t *state)
 {
   free(state);
+}
+
+int uniform_set(initial_t *state, int n, int n0, real_t *x)
+{
+  initial_uniform_t *s = (initial_uniform_t *) state;
+  real_t a;
+  real_t *y;
+  int nn, i;
+
+  nn = 2 * n;
+
+  y = x + n;
+
+  rng_gaussian(nn, x, 1.0);
+  for (i = 0; i < nn; i++)
+    a += x[i] * x[i];
+  a = _sqrt(a);
+  for (i = 0; i < nn; i++)
+    x[i] /= a;
+}
+
+size_t uniform_nbytes_impl()
+{
+  return sizeof(initial_1site_t);
+}
+
+size_t uniform_nbytes(initial_t *state)
+{
+  return uniform_nbytes_impl();
+}
+
+initial_uniform_t *mk_initial_uniform()
+{
+  initial_uniform_t *s;
+  s = (initial_uniform_t *) malloc(uniform_nbytes_impl());
+  if (!s)
+    return NULL;
+  s->set = &uniform_set;
+  s->del = &initial_del;
+  s->nbytes = &uniform_nbytes;
+  
+  return s;
 }
 
 int site_set(initial_t *state, int n, int n0, real_t *x)
@@ -19,7 +62,7 @@ int site_set(initial_t *state, int n, int n0, real_t *x)
   y = x + n;
 
   memset(x, 0, 2 * n * sizeof(real_t));
-  rnd_uniform(1, &a, 2.0 * M_PI);
+  rng_uniform(1, &a, 2.0 * M_PI);
   x[n0] = cos(a);
   y[n0] = sin(a);
 
@@ -49,7 +92,6 @@ initial_1site_t *mk_initial_1site(int n0)
   
   return s;
 }
-
 
 int state_set(initial_t *state, int n, int n0, real_t *x)
 {

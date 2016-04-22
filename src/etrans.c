@@ -16,10 +16,15 @@
 #include <math.h>
 
 #ifdef WIN32
+#include <process.h>
 #define unlink _unlink
+#define getpid _getpid
+typedef int pid_t;
 #else
 #include <unistd.h>
 #endif
+
+#include "gettimeofday.h"
 
 #ifdef MPI
 #include <mpi.h>
@@ -81,7 +86,7 @@ int main(int argc, char **argv)
   etrans_opt_t opt;
   void **argtable;
   char *seq, *progname = "etrans", *fntmp;
-  int nsamp, exitcode, nerrors, qn, i, heat_nstep, nfunc, ndone, n0;
+  int nsamp, exitcode, nerrors, qn, i, heat_nstep, nfunc, ndone, n0, mg;
   long k;
   size_t fnlen, fcnt;
   real_t tmax, heat_h, a;
@@ -96,6 +101,9 @@ int main(int argc, char **argv)
   charge_parm_t charge_parm;
   char mdl[4];
   size_t nb, tmem;
+  unsigned int seed;
+  struct timeval tm;
+  pid_t pid;
 
   argtable = argtable_mk(&opt);
   if (!argtable) {
@@ -132,12 +140,30 @@ int main(int argc, char **argv)
     }
   }
 
+  if (opt.mg->ival[0] == 4) {
+    mg = 2;
+  } else if (opt.mg->ival[0] == 2) {
+    mg = 1;
+  } else if (opt.mg->ival[0] == 1) {
+    mg = 0;
+  } else {
+    fprintf(stderr, "%s: invalid value of -g.\n", progname);
+    fprintf(stderr, "Try '%s --help' for more information.\n", progname);
+    exitcode = -50;
+    goto exit;
+  }
+
+  pid = getpid();
+  gettimeofday(&tm, NULL);
+  seed = (int) tm.tv_usec * (int) pid;
+
 #ifdef MPI
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &np);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   if (!rank)
     printf("Running %s in parallel on %d processor(s).\n", progname, np);
+  seed = seed * np + rank;
 #else
   np = 1;
   rank = 0;
@@ -147,11 +173,17 @@ int main(int argc, char **argv)
     options_print(argc, argv);
     printf("\n");
   }
+  rng_init(seed);
+  /*
   if (rnd_init()) {
     fprintf(stderr, "%s: initialazation of random generator failed.\n", progname);
     exitcode = -4;
     goto exit1;
   }
+  */
+
+  d.ntm = (real_t) opt.ntm->dval[0];
+  d.nthr = (real_t) opt.nthr->dval[0];
 
   rst = opt.rst->count;
   if (rst) {
@@ -362,6 +394,8 @@ int main(int argc, char **argv)
 
   if (!strcmp(opt.init->sval[0], "1")) {
     d.s = (initial_t *) mk_initial_1site(d.ch->n0);
+  } else if (!strcmp(opt.init->sval[0], "U")) {
+    d.s = (initial_t *) mk_initial_uniform();
   } else if (!strcmp(opt.init->sval[0], "P")) {
     if (!opt.initfn->count) {
       fprintf(stderr, "%s: if -y P, you must specify initial state file (-I).\n", progname);
@@ -456,7 +490,7 @@ int main(int argc, char **argv)
     printf("Used memory on slave:  %12ld\n", nb);
     printf("Used memory on master: %12ld\n\n", nb + si->numel * sizeof(double));
 
-    printf("Magnus order: %d\n\n", opt.mg4->count > 0 ? 4 : 2);
+    printf("Magnus order: %d\n\n", 1 << mg);
 
     printf("Nsamp: %d/%d\n\n", ndone, ndone + np * nsamp);
 
@@ -477,7 +511,7 @@ int main(int argc, char **argv)
     /* reset partial statistics */
     sol_setzero(si);
     /* solve quantum equation qn times */
-    if (eq(&d, d.h, tmax, qn, opt.mg4->count > 0, si)) {
+    if (eq(&d, d.h, tmax, qn, mg, si)) {
       fprintf(stderr, "%s: error in equation solution process\n", progname);
       exitcode = -50;
       goto exit11;
@@ -556,7 +590,7 @@ int main(int argc, char **argv)
  exit3:
   free(seq);
  exit2:
-  rnd_finish();
+  /*  rnd_finish();*/
  exit1:
 #ifdef MPI
   if (exitcode)

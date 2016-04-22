@@ -1,9 +1,10 @@
 #include "config.h"
 #include "osc.h"
 
-#include <time.h>
+#include <rng.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
 
 charge_parm_t osc_charge_defs = {
   0.02, 0.0, /* chi_e */
@@ -72,7 +73,7 @@ void osc_x0_rand(chain_eq_t *chain, real_t *x)
     return;
   }
   o->sv = _sqrt(o->kt);
-  rnd_gaussian(o->n, x + o->n, o->sv);
+  rng_gaussian(o->n, x + o->n, o->sv);
 
   if (o->D == 0.0) {
     o->su = _sqrt(o->kt / o->K);
@@ -88,7 +89,7 @@ void osc_x0_rand(chain_eq_t *chain, real_t *x)
     a = _sqrt(xi);
     b = _sqrt(1.0 - xi);
   }
-  rnd_gaussian(o->n, x, o->su);
+  rng_gaussian(o->n, x, o->su);
 
   if (o->D == 0.0)
     return;

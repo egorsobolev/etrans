@@ -21,11 +21,14 @@ int fpset_create(const char *fn, int n, int n0)
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   if (!rank) {
     m[0] = n; m[1] = n0;
-    if (MPI_File_write_shared(fh, m, 2, MPI_INT, &status) != MPI_SUCCESS)
+    if (MPI_File_write_at(fh, 0, m, 2, MPI_INT, &status) != MPI_SUCCESS)
       return -2;
     if (MPI_Get_count(&status, MPI_INT, &numel) != MPI_SUCCESS || numel != 2)
       return -2;
   }
+  if (MPI_File_seek_shared(fh, 2 * sizeof(int), MPI_SEEK_SET) != MPI_SUCCESS)
+    return -2;
+  
   enable = 1;
   return 0;
 }
@@ -46,11 +49,13 @@ int fpset_open(const char *fn, int n, int n0, int nsamp)
     if (!rank) {
       m[0] = n;
       m[1] = n0;
-      if (MPI_File_write_shared(fh, m, 2, MPI_INT, &status) != MPI_SUCCESS)
+      if (MPI_File_write_at(fh, 0, m, 2, MPI_INT, &status) != MPI_SUCCESS)
 	return -2;
       if (MPI_Get_count(&status, MPI_INT, &numel) != MPI_SUCCESS || numel != 2)
 	return -2;
     }
+    if (MPI_File_seek_shared(fh, 2 * sizeof(int), MPI_SEEK_SET) != MPI_SUCCESS)
+      return -2;
     enable = 1;
     return 0;
   }

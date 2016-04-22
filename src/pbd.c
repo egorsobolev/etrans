@@ -3,6 +3,7 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
 
 charge_parm_t pbd_charge_defs = {
   8.809624572754315, 0.0,/* chi_e */

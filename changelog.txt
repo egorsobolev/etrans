@@ -1,3 +1,14 @@
+2016-04-22 Egor Sobolev <egor@impb.psn.ru>
+ * removed linking of MKL or GSL
+ * added source code of pseudo-random grenerator mt19937 and ziggurat algorithm
+ * added 1st order matrix integral sheme and changed options -4 for 4rd order to -g <int> to specify one of 1,2 or 4 order.
+ * added total energy functional (E)
+ * added uniform initial charge distribution (-y U)
+ * fixed skipped minus in S functional
+ * added options to control norm correction: -H <thr> - norm correction threshold and -n <tm> - time interval interval for norm correction. Norm will be corrected if |sum(b^2)-1| > thr or at regular time intervals tm
+ * changed -O3 to -O2 for GCC since in GCC 4.9.2 -ftree-loop-optimization included in -O3 generates segmentation fault
+ * changed procedure writes 2-int header (n, n0) in final point file to syncronize processes
+ 
 2015-04-20 Egor Sobolev <egor@impb.psn.ru>
  * fixed calculation of first initial point offset when restart from control point (-y S -c)
  * fixed position in final point set file when restart from control point (-w <file> -c)
