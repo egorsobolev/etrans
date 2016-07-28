@@ -1,3 +1,7 @@
+2016-07-28 Egor Sobolev <egor@impb.psn.ru>
+ * added parameters for PDB chain heating procedure
+ * changed heating procedure for PDB chain to simple one
+ 
 2016-04-22 Egor Sobolev <egor@impb.psn.ru>
  * removed linking of MKL or GSL
  * added source code of pseudo-random grenerator mt19937 and ziggurat algorithm

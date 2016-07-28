@@ -11,7 +11,7 @@ DO=../bin/etrans.MPI
 FN_IN=a9.txt
 FN_OUT=$PBS_JOBNAME
 
-OPTS=' -4 -N 1250 -T 300 -Q 2 -p parm.txt
+OPTS=' -g 4 -N 1250 -T 300 -Q 2 -p parm.txt
  -h 0.4 -O outsh.txt -w a9_t600.dat '
 
 

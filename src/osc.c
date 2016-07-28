@@ -6,6 +6,10 @@
 #include <math.h>
 #include <stdlib.h>
 
+#ifdef MPI
+#include <mpi.h>
+#endif
+
 charge_parm_t osc_charge_defs = {
   0.02, 0.0, /* chi_e */
   0.0, 6.84, 10.0, 10.0, /*  G  A  T  C */
@@ -59,6 +63,14 @@ void osc_holstein_dv(const chain_eq_t *chain, const real_t *x, real_t *dv, real_
 
 void osc_equilibrate(chain_eq_t *chain)
 {
+  int rank;
+#ifdef MPI
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#else
+  rank = 0;
+#endif
+  if (!rank)
+    printf("Analytic equilibrium distribution.\n\n");
 }
 
 void osc_x0_rand(chain_eq_t *chain, real_t *x)

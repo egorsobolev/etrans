@@ -16,8 +16,6 @@ f = fopen(fn, 'r');
 r.n = fread(f, 1, 'int');
 r.n0 = fread(f, 1, 'int');
 
-r.n=25;
-
 if nargin > 1
     x = fread(f, 4 * r.n * nsamp, 'double');
 else

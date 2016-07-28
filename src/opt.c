@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NOPTION 32
+#define NOPTION 35
 
 void **argtable_mk(etrans_opt_t *o)
 {
@@ -41,6 +41,10 @@ void **argtable_mk(etrans_opt_t *o)
   t[i++] = o->chi = arg_dbl0("L", NULL, NULL, "chi - coupling constant in quantum equation (0.02)");
   t[i++] = o->mu = arg_dbl0("M", NULL, NULL, "mu - coupling constant in classic equation (0.02)");
   t[i++] = o->prmfn = arg_file0("p", NULL, NULL, "file of quantum parameters");
+
+  t[i++] = o->heattm = arg_dbl0("b", NULL, NULL, "Heating time for PBD chain");
+  t[i++] = o->memtm = arg_dbl0("i", NULL, NULL, "Memory time of PDB chain");
+  t[i++] = o->gamma_h = arg_dbl0("G", NULL, NULL, "gamma_h - friction in the heating procedure");
   /*
   t[i++] = o->nh = arg_int0("g", NULL, NULL, "number of heating steps (0)");
   t[i++] = o->hh = arg_dbl0("u", NULL, NULL, "free oscilator time step (1e-3 * 2pi/omega0)");

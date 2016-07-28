@@ -5,6 +5,10 @@
 #include <math.h>
 #include <stdlib.h>
 
+#ifdef MPI
+#include <mpi.h>
+#endif
+
 charge_parm_t pbd_charge_defs = {
   8.809624572754315, 0.0,/* chi_e */
   264.4117479078003, 360.3676241646633, 405.1470330845326, 405.1470330845326, /*  G  A  T  C */
@@ -203,13 +207,65 @@ void pbd_equilibrate(chain_eq_t *chain)
   free(Mu);
 }
 
+void pbd_equilibrate_1(chain_eq_t *chain)
+{
+  pbd_chain_t *c = (pbd_chain_t *) chain;
+  int i, rank;
+  real_t Gamma_S, sigF_S, ep, ek, *u, *v;
+  FILE *f;
+
+#ifdef MPI
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#else
+  rank = 0;
+#endif
+
+  Gamma_S = c->Gamma;
+  sigF_S = c->sigF;
+
+  c->Gamma = c->GammaH;
+  c->sigF = _sqrt(2.0 * c->theta * c->Gamma);
+
+  if (c->sigF == 0.0) {
+    if (!rank)
+      printf("Random force is zero. Not heating.");
+    return;
+  }
+
+  if (!rank)
+    printf("Heating. Nstep: %d Gamma: %g T: %g (K)\n\n", c->nheat, c->Gamma, c->theta / c->theta0);
+
+  u = c->f0;
+  v = u + c->n;
+  ep = pbd_en_potential(chain, u);
+  ek = en_kinetic(c->n, v);
+
+  if (!rank) {
+    f = fopen("heating.txt", "wt");
+    fprintf(f, "%d\n", c->nheat / 100 + 1);
+    fprintf(f, "%d %.18e %.18e\n", 0, ek, ep);
+  }
+  for (i = 0; i < c->nheat; i++) {
+    rk_2o2s1g(chain, c->runge_temp, c->h, c->f0);
+    ep = pbd_en_potential(chain, u);
+    ek = en_kinetic(c->n, v);
+
+    if (!rank && !((i+1) % 100))
+      fprintf(f, "%d %.18e %.18e\n", i+1, ek, ep);
+  }
+  if (!rank)
+    fclose(f);
+
+  c->Gamma = Gamma_S;
+  c->sigF = sigF_S;
+}
+
 void pbd_x0_rand(chain_eq_t *chain, real_t *x)
 {
   pbd_chain_t *c = (pbd_chain_t *) chain;
   int i, n;
 
-  n = 50000;
-  for (i = 0; i < n; ++i)
+  for (i = 0; i < c->nmem; ++i)
     rk_2o2s1g(chain, c->runge_temp, c->h, c->f0);
 
   memcpy(x, c->f0, 2 * c->n * sizeof(real_t));
@@ -224,6 +280,10 @@ int pbd_init(chain_eq_t *chain, etrans_opt_t *o)
 {
   pbd_chain_t *c = (pbd_chain_t *) chain;
 
+  if (o->gamma_h->count)
+    c->GammaH = o->gamma_h->dval[0];
+  else
+    c->GammaH = c->Gamma;
   if (o->gamma->count)
     c->Gamma = o->gamma->dval[0];
   c->theta0 = 1.07716655e-3;
@@ -249,7 +309,22 @@ int pbd_init(chain_eq_t *chain, etrans_opt_t *o)
   if (o->h->count)
     c->h = o->h->dval[0];
   else
-    c->h = 0.005 / _sqrt(c->omegaM2 > c->omegaB2 ? c->omegaM2 : c->omegaB2); 
+    c->h = 0.005 / _sqrt(c->omegaM2 > c->omegaB2 ? c->omegaM2 : c->omegaB2);
+
+  if (o->heattm->count)
+    c->nheat = _ceil(o->heattm->dval[0] / c->h);
+  else
+    c->nheat = 1000000;
+
+  if (o->memtm->count)
+    c->nmem = _ceil(o->memtm->dval[0] / c->h);
+  else
+    c->nmem = 50000;
+
+  if ((c->GammaH * c->theta) == 0.0) {
+    c->nheat = 0;
+    c->nmem = 0;
+  }
 
   return 0;
 }
@@ -324,7 +399,7 @@ pbd_chain_t *mk_pbd(int n)
 
   c->dv = &pbd_dv;
   c->dv_hst = &pbd_holstein_dv;
-  c->equilibrate = &pbd_equilibrate;
+  c->equilibrate = &pbd_equilibrate_1;
   c->x0 = &pbd_x0_rand;
   c->del = &pbd_free;
   c->en_potential = &pbd_en_potential;

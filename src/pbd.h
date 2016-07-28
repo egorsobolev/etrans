@@ -31,6 +31,8 @@ struct PBDChain
   real_t omegaB2, epsilon, rho;
   real_t theta0, theta;
   real_t Gamma, chi;
+  real_t GammaH;
+  int nheat, nmem;
   int n1;
   real_t *f0;
 

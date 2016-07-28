@@ -2,6 +2,7 @@
 #include "etrans.h"
 #include "osc.h"
 #include "sol.h"
+#include "fpset.h"
 
 #include <rng.h>
 
