@@ -11,7 +11,7 @@ MPICC=mpicc
 CFLAGS= -O2 -funroll-all-loops -ffast-math -fno-trapping-math
 LFLAGS= -O3
 
-MPICFLAGS= -O2 -funroll-all-loops -ffast-math -fno-trapping-math
+MPICFLAGS= -O2 -funroll-all-loops -ffast-math -fno-trapping-math -DMPI
 MPILFLAGS= -O3
 
 SRC = $(wildcard *.c)
