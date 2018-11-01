@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 #ifdef MPI
-#include <mpi.h>
+#include <mpi/mpi.h>
 #endif
 
 charge_parm_t osc_charge_defs = {

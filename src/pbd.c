@@ -6,7 +6,7 @@
 #include <stdlib.h>
 
 #ifdef MPI
-#include <mpi.h>
+#include <mpi/mpi.h>
 #endif
 
 charge_parm_t pbd_charge_defs = {

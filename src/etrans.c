@@ -14,6 +14,7 @@
 #include <malloc.h>
 #include <float.h>
 #include <math.h>
+#include <rng.h>
 
 #ifdef WIN32
 #include <process.h>
@@ -27,7 +28,7 @@ typedef int pid_t;
 #include "gettimeofday.h"
 
 #ifdef MPI
-#include <mpi.h>
+#include <mpi/mpi.h>
 #define walltime() MPI_Wtime()
 #else
 #include <time.h>

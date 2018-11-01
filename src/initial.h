@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 #ifdef MPI
-#include <mpi.h>
+#include <mpi/mpi.h>
 #endif
 
 typedef struct INITIAL_STATE initial_t;

@@ -4,7 +4,7 @@ static int enable = 0;
 
 #ifdef MPI
 
-#include <mpi.h>
+#include <mpi/mpi.h>
 #include <stdio.h>
 
 static MPI_File fh;

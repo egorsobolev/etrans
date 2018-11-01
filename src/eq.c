@@ -14,7 +14,7 @@
 #include <float.h>
 
 #ifdef MPI
-#include <mpi.h>
+#include <mpi/mpi.h>
 #define walltime() MPI_Wtime()
 #else
 #include <time.h>
