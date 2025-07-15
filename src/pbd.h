@@ -6,7 +6,7 @@
 #include "chain.h"
 #include "charge.h"
 
-charge_parm_t pbd_charge_defs;
+extern charge_parm_t pbd_charge_defs;
 
 struct PBDChain
 {
