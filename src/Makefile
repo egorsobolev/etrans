@@ -20,11 +20,11 @@ OBJSRL = $(addprefix .o.serial/,$(SRC:.c=.o))
 
 all:	serial mpi
 
-serial:	argtable librng $(OBJSRL)
+serial:	argtable librng $(OBJSRL) | bin
 	$(CC) -o ../bin/etrans $(OBJSRL) $(LFLAGS) -lm \
 	    ../argtable2-13/lib/libargtable2.a ../rng/librng.a
 
-mpi:	argtable librng $(OBJMPI)
+mpi:	argtable librng $(OBJMPI) | bin
 	$(MPICC) -o ../bin/etrans.MPI $(OBJMPI) $(MPILFLAGS) -lm \
             ../argtable2-13/lib/libargtable2.a ../rng/librng.a
 
@@ -48,6 +48,9 @@ $(OBJSRL):	| .o.serial
 .o.serial:
 	mkdir .o.serial
 
+bin:
+	mkdir -p ../bin
+
 argtable:	| ../argtable2-13
 
 ../argtable2-13: ../argtable2-13.tar.gz
@@ -55,7 +58,7 @@ argtable:	| ../argtable2-13
 	    cd ..; \
 	    tar -xzf argtable2-13.tar.gz; \
 	    cd argtable2-13; \
-	    ./configure --prefix=`pwd`; \
+	    CFLAGS='--std=c90' ./configure --prefix=`pwd`; \
 	    make install; \
 	    cd ../src; \
 	)
@@ -82,6 +85,6 @@ librng:		| ../rng
 clean:
 	-rm -rf ../argtable2-13
 	-rm -rf ../rng
-	-rm -f ../bin/etrans ../bin/etrans.MPI
+	-rm -rf ../bin
 	-rm -rf .o.mpi .o.serial
 
