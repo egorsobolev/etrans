@@ -22,20 +22,20 @@ all:	serial mpi
 
 serial:	argtable librng $(OBJSRL)
 	$(CC) -o ../bin/etrans $(OBJSRL) $(LFLAGS) -lm \
-	    ../argtable2-13/lib/libargtable2.a ../rng1-0/librng.a
+	    ../argtable2-13/lib/libargtable2.a ../rng/librng.a
 
 mpi:	argtable librng $(OBJMPI)
 	$(MPICC) -o ../bin/etrans.MPI $(OBJMPI) $(MPILFLAGS) -lm \
-            ../argtable2-13/lib/libargtable2.a ../rng1-0/librng.a
+            ../argtable2-13/lib/libargtable2.a ../rng/librng.a
 
 .o.mpi/%.o:	%.c
 	$(MPICC) -I/usr/include/x86_64-linux-gnu $(MPICFLAGS) \
-	    -I../argtable2-13/include -I../rng1-0 \
+	    -I../argtable2-13/include -I../rng \
 	    -c -o $@ $<
 
 .o.serial/%.o:	%.c
 	$(CC) -I/usr/include/x86_64-linux-gnu ${CFLAGS} \
-	    -I../argtable2-13/include -I../rng1-0 \
+	    -I../argtable2-13/include -I../rng \
 	    -c -o $@ $<
 
 $(OBJMPI):	| .o.mpi
@@ -67,13 +67,13 @@ argtable:	| ../argtable2-13
 	    cd src; \
 	)
 
-librng:		| ../rng1-0
+librng:		| ../rng
 
-../rng1-0:
+../rng:
 	( \
 	    cd ..; \
-	    tar -xzf rng1-0.tar.gz; \
-	    cd rng1-0; \
+	    git clone https://github.com/egorsobolev/rng.git; \
+	    cd rng; \
             make; \
 	    cd ../src; \
 	)
@@ -81,7 +81,7 @@ librng:		| ../rng1-0
 .PHONY:	clean
 clean:
 	-rm -rf ../argtable2-13
-	-rm -rf ../rng1-0
+	-rm -rf ../rng
 	-rm -f ../bin/etrans ../bin/etrans.MPI
 	-rm -rf .o.mpi .o.serial
 
